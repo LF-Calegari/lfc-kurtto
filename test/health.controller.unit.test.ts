@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { NextFunction, Request, Response } from 'express';
 
-import healthController from '../src/controllers/HealthController.js';
 import { env } from '../src/config/env.js';
+import healthController from '../src/controllers/HealthController.js';
 
 const successCaseName =
-  'HealthController.check returns 200 with expected payload contract';
+  'HealthController.check returns 503 when database is disconnected';
 
 test(successCaseName, async () => {
   const statusCalls: number[] = [];
@@ -29,13 +29,14 @@ test(successCaseName, async () => {
 
   await healthController.check({} as Request, res, next);
 
-  assert.deepEqual(statusCalls, [200]);
+  assert.deepEqual(statusCalls, [503]);
   assert.equal(jsonCalls.length, 1);
   assert.equal(nextCalls.length, 0);
 
   const payload = jsonCalls[0] as Record<string, unknown>;
-  assert.equal(payload.status, 'ok');
-  assert.equal(payload.message, 'API is running');
+  assert.equal(payload.status, 'degraded');
+  assert.equal(payload.database, 'disconnected');
+  assert.equal(payload.message, 'API is running but database is unavailable');
   assert.equal(payload.environment, env.NODE_ENV);
   assert.equal(typeof payload.uptime, 'number');
   assert.ok(!Number.isNaN(Date.parse(String(payload.timestamp))));

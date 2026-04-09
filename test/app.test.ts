@@ -1,14 +1,19 @@
+import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import request from 'supertest';
 
 import app from '../src/app.js';
+import { registerDatabaseForTests } from './register-db.js';
+
+registerDatabaseForTests();
 
 test('GET /api/v1/health returns service status', async () => {
   const response = await request(app).get('/api/v1/health');
 
   assert.equal(response.status, 200);
   assert.equal(response.body.status, 'ok');
+  assert.equal(response.body.database, 'connected');
   assert.equal(response.body.environment, process.env.NODE_ENV);
   assert.ok(response.body.timestamp);
   assert.equal(typeof response.body.uptime, 'number');

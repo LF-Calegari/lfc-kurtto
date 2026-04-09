@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:18-alpine
+        image: postgres:16-alpine
         env:
           POSTGRES_DB: kurtto
           POSTGRES_USER: postgres
@@ -34,6 +34,7 @@ jobs:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: kurtto
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/kurtto
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,6 +49,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Run database migrations
+        run: npm run migration:run
 
       - name: Run lint
         run: npm run lint
