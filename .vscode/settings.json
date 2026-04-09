@@ -1,0 +1,9 @@
+{
+  "files.trimTrailingWhitespace": false,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+  "eslint.format.enable": true,
+  "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "always"
+  }
+}

@@ -1,16 +1,45 @@
-import js from "@eslint/js";
-import tseslint from "typescript-eslint";
+import globals from 'globals';
+import pluginJs from '@eslint/js';
+import stylistic from '@stylistic/eslint-plugin';
+import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
+export default [
+  { files: ['**/*.{js,mjs,cjs,ts}'] },
+  { ignores: ['node_modules/**', 'dist/**'] },
   {
-    ignores: ["dist/**", "node_modules/**"]
+    languageOptions: {
+      globals: globals.node,
+    },
   },
-  js.configs.recommended,
+  pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["src/**/*.ts", "test/**/*.ts"],
+    plugins: { '@stylistic': stylistic },
     rules: {
-      "@typescript-eslint/no-explicit-any": "error"
-    }
-  }
-);
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@stylistic/comma-dangle': ['error', 'always-multiline'],
+      '@stylistic/eol-last': 'error',
+      '@stylistic/indent': ['error', 2],
+      '@stylistic/linebreak-style': ['error', 'unix'],
+      '@stylistic/max-len': [
+        'error',
+        {
+          code: 80,
+          ignoreComments: true,
+          ignoreTemplateLiterals: true,
+        },
+      ],
+      '@stylistic/quotes': ['error', 'single'],
+      '@stylistic/semi': 'error',
+      'sort-imports': ['error', { ignoreDeclarationSort: true }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
+  },
+];
