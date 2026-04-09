@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { DataSource } from 'typeorm';
 
-import { Url } from '../entities/urls.entity.js';
+import { Url } from '../entities/Url.js';
 import { env } from './env.js';
 
 const __filename = fileURLToPath(import.meta.url);

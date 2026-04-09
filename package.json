@@ -18,7 +18,7 @@
     "migration:generate": "npm run build && tsx ./node_modules/typeorm/cli.js migration:generate src/migrations/MigrationName -d dist/config/data-source.js",
     "migration:run": "tsx ./node_modules/typeorm/cli.js migration:run -d src/config/data-source.ts",
     "migration:revert": "tsx ./node_modules/typeorm/cli.js migration:revert -d src/config/data-source.ts",
-    "seed": "tsx src/seeds/urls.seed.cli.ts"
+    "seed": "tsx src/seeds/url.seed.cli.ts"
   },
   "imports": {
     "@config/*": {

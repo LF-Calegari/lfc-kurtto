@@ -44,7 +44,7 @@ API disponivel em `http://localhost:3000/api/v1`.
 - `npm run typeorm`: atalho para a CLI do TypeORM via `tsx`.
 - `npm run migration:generate`: gera migration a partir do diff das entidades (executa `npm run build` antes; substitua `MigrationName` no script por um nome descritivo ou passe o caminho desejado; usa `dist/config/data-source.js` como DataSource).
 - `npm run migration:run` / `npm run migration:revert`: aplica ou reverte migrations usando `src/config/data-source.ts`.
-- `npm run seed`: executa o seed idempotente de URLs de desenvolvimento (`src/seeds/urls.seed.cli.ts`).
+- `npm run seed`: executa o seed idempotente de URLs de desenvolvimento (`src/seeds/url.seed.cli.ts`).
 
 ## Banco de dados (TypeORM)
 
