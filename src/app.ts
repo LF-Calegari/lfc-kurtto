@@ -1,8 +1,8 @@
-import express from 'express';
+import express from "express";
 
-import errorHandler from '@middlewares/errorHandler';
-import routes from '@routes/index';
-import swagger from './swagger/index.js';
+import errorHandler from "@middlewares/errorHandler";
+import routes from "@routes/index";
+import swagger from "./swagger/index.js";
 
 const app = express();
 
@@ -11,7 +11,7 @@ routes(app);
 
 app.use((_req, res) => {
   res.status(404).json({
-    message: 'Route not found',
+    message: "Route not found"
   });
 });
 

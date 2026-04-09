@@ -17,7 +17,7 @@
       "@middlewares/*": ["./src/middlewares/*.ts"],
       "@routes/*": ["./src/routes/*.ts"]
     },
-    "types": ["node", "express"]
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "test"]

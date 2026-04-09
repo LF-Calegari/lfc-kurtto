@@ -1,6 +1,6 @@
-import { Router } from 'express';
+import { Router } from "express";
 
-import healthController from '@controllers/HealthController';
+import healthController from "@controllers/HealthController";
 
 const healthRouter = Router();
 
@@ -26,9 +26,6 @@ const healthRouter = Router();
  *                   type: string
  *                   example: API is running
  */
-healthRouter.get(
-  '/',
-  (req, res, next) => healthController.check(req, res, next),
-);
+healthRouter.get("/", (req, res, next) => healthController.check(req, res, next));
 
 export default healthRouter;
