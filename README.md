@@ -40,6 +40,7 @@ API disponivel em `http://localhost:3000/api/v1`.
 - `npm run typecheck`: valida tipos sem gerar build.
 - `npm run lint`: executa lint do projeto.
 - `npm run test`: executa testes de integracao.
+- `npm run test:coverage`: executa testes com geracao de cobertura `lcov` em `coverage/lcov.info`.
 
 ## Docker
 
@@ -63,6 +64,18 @@ Executar testes via profile:
 ```bash
 docker compose --profile test run --rm test
 ```
+
+## CI SonarCloud
+
+O workflow `.github/workflows/sonarcloud.yml` executa em `push` e `pull_request` nas branches `main` e `development`.
+
+Segredos obrigatorios no repositorio GitHub:
+
+- `SONAR_TOKEN`
+- `SONAR_ORGANIZATION`
+- `SONAR_PROJECT_KEY`
+
+Para a analise funcionar, o pipeline gera cobertura `lcov` no caminho `coverage/lcov.info`, usado na propriedade `sonar.javascript.lcov.reportPaths`.
 
 ## Debug
 
