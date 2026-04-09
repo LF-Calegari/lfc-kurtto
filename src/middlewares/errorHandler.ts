@@ -1,17 +1,9 @@
-import { NextFunction, Request, Response } from "express";
+import { ErrorRequestHandler } from "express";
 
 import { env } from "@config/env";
 
-const errorHandler = (
-  err: Error,
-  _req: Request,
-  res: Response,
-  _next: NextFunction
-): void => {
-  // Keep fourth argument to preserve Express error-handler signature.
-  void _next;
-
-  console.error("[error]", err);
+const errorHandler: ErrorRequestHandler = (err, _req, res, _next): void => {
+  console.error("[error]", err, { hasNext: typeof _next === "function" });
 
   const isProduction = env.NODE_ENV === "production";
 
