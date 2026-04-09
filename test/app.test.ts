@@ -20,3 +20,11 @@ test('GET /api/v1/documentation returns swagger ui page', async () => {
   assert.equal(response.status, 301);
   assert.match(response.headers.location ?? '', /\/api\/v1\/documentation\/$/);
 });
+
+test('GET /api/v1/documentation/ returns HTML response', async () => {
+  const response = await request(app).get('/api/v1/documentation/');
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers['content-type'] ?? '', /text\/html/i);
+  assert.match(response.text, /swagger/i);
+});
