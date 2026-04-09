@@ -12,8 +12,21 @@ const __dirname = path.dirname(__filename);
 
 const migrationsGlob = path.join(__dirname, '../migrations/*{.ts,.js}');
 
-function buildDataSource(): DataSource {
-  const databaseUrl = env.DATABASE_URL?.trim();
+export type CreateAppDataSourceOptions = {
+  /**
+   * When defined, overrides how `DATABASE_URL` from env is applied.
+   * Use empty string to force host/port/credentials mode (same as unset URL).
+   */
+  databaseUrlOverride?: string;
+};
+
+export function createAppDataSource(
+  buildOptions?: CreateAppDataSourceOptions,
+): DataSource {
+  const databaseUrl =
+    buildOptions?.databaseUrlOverride !== undefined
+      ? buildOptions.databaseUrlOverride.trim() || undefined
+      : env.DATABASE_URL?.trim();
 
   const common = {
     type: 'postgres' as const,
@@ -45,4 +58,4 @@ function buildDataSource(): DataSource {
   });
 }
 
-export const AppDataSource = buildDataSource();
+export const AppDataSource = createAppDataSource();

@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_DB: kurtto
           POSTGRES_USER: postgres
@@ -77,3 +77,4 @@ jobs:
             -Dsonar.tests=test
             -Dsonar.test.inclusions=**/*.test.ts
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.coverage.exclusions=**/migrations/**

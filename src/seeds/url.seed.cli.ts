@@ -3,7 +3,7 @@ import 'reflect-metadata';
 import { AppDataSource } from '../config/data-source.js';
 import { runUrlSeed } from './url.seed.js';
 
-async function main(): Promise<void> {
+export async function runUrlSeedCli(): Promise<void> {
   try {
     await AppDataSource.initialize();
     await runUrlSeed();
@@ -17,5 +17,3 @@ async function main(): Promise<void> {
     }
   }
 }
-
-void main();

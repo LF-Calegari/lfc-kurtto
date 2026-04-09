@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { mock } from 'node:test';
 
 import express from 'express';
 import request from 'supertest';
@@ -18,10 +18,29 @@ test('GET /api/v1/health returns 200 with expected contract', async () => {
   assert.equal(response.status, 200);
   assert.equal(response.body.status, 'ok');
   assert.equal(response.body.database, 'connected');
+  assert.equal(response.body.message, 'API is running');
   assert.equal(response.body.environment, 'test');
   assert.equal(typeof response.body.uptime, 'number');
   assert.ok(Number.isFinite(response.body.uptime));
   assert.ok(!Number.isNaN(Date.parse(response.body.timestamp)));
+});
+
+test('GET /api/v1/health returns 503 when SELECT 1 fails', async () => {
+  const { AppDataSource } = await import('../src/config/data-source.js');
+
+  const queryMock = mock.method(AppDataSource, 'query', async () => {
+    throw new Error('simulated query failure');
+  });
+
+  try {
+    const response = await request(app).get('/api/v1/health');
+
+    assert.equal(response.status, 503);
+    assert.equal(response.body.database, 'disconnected');
+    assert.equal(response.body.status, 'degraded');
+  } finally {
+    queryMock.mock.restore();
+  }
 });
 
 test('GET /api/v1/health returns 503 when database is down', async () => {

@@ -13,7 +13,7 @@ do tempo.
 - Node.js 24 LTS (Alpine em Docker)
 - TypeScript
 - Express.js
-- PostgreSQL 16
+- PostgreSQL 18
 - Docker / Docker Compose
 
 ## Pre-requisitos
@@ -44,13 +44,14 @@ API disponivel em `http://localhost:3000/api/v1`.
 - `npm run typeorm`: atalho para a CLI do TypeORM via `tsx`.
 - `npm run migration:generate`: gera migration a partir do diff das entidades (executa `npm run build` antes; substitua `MigrationName` no script por um nome descritivo ou passe o caminho desejado; usa `dist/config/data-source.js` como DataSource).
 - `npm run migration:run` / `npm run migration:revert`: aplica ou reverte migrations usando `src/config/data-source.ts`.
-- `npm run seed`: executa o seed idempotente de URLs de desenvolvimento (`src/seeds/url.seed.cli.ts`).
+- `npm run seed`: executa o seed idempotente de URLs de desenvolvimento (`src/seeds/url.seed.cli.entry.ts`; logica em `url.seed.cli.ts`).
 
 ## Banco de dados (TypeORM)
 
 - DataSource centralizado em `src/config/data-source.ts`: `synchronize` desligado; `logging` apenas com `NODE_ENV=development`.
 - Conexao: use `DATABASE_URL` **ou** `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` (com opcionais `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` como alias documentados na issue).
 - Apos subir o Postgres (local ou Docker), aplique as migrations: `npm run migration:run`.
+- UUIDs na tabela `urls`: a migration define default `gen_random_uuid()`; o DataSource usa `uuidExtension: 'pgcrypto'` para alinhar ao TypeORM (o driver cria `CREATE EXTENSION IF NOT EXISTS pgcrypto` quando necessario). Em PostgreSQL 13+, `gen_random_uuid()` tambem esta disponivel no nucleo; manter `pgcrypto` e a escolha explicita do projeto para consistencia com o TypeORM.
 - Seeds de desenvolvimento: `npm run seed` (segunda execucao nao duplica por `short_code`).
 
 ### Testes com PostgreSQL
@@ -63,7 +64,7 @@ npm run migration:run
 npm test
 ```
 
-No CI (SonarCloud), o workflow sobe Postgres 16, roda `migration:run` e em seguida lint, typecheck e testes.
+No CI (SonarCloud), o workflow sobe Postgres 18 (imagem `postgres:18-alpine`), roda `migration:run` e em seguida lint, typecheck e testes.
 
 ## Docker
 
@@ -119,6 +120,7 @@ src/
   routes/
   seeds/
   app.ts
+  bootstrap.ts
   server.ts
 test/
 ```
