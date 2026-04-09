@@ -13,7 +13,12 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "NODE_ENV=test NODE_OPTIONS=--conditions=source tsx --test test/*.test.ts",
-    "test:coverage": "c8 --reporter=lcov --reporter=text npm run test"
+    "test:coverage": "c8 --reporter=lcov --reporter=text --exclude 'src/migrations/**' npm run test",
+    "typeorm": "tsx ./node_modules/typeorm/cli.js",
+    "migration:generate": "npm run build && tsx ./node_modules/typeorm/cli.js migration:generate src/migrations/MigrationName -d dist/config/data-source.js",
+    "migration:run": "tsx ./node_modules/typeorm/cli.js migration:run -d src/config/data-source.ts",
+    "migration:revert": "tsx ./node_modules/typeorm/cli.js migration:revert -d src/config/data-source.ts",
+    "seed": "tsx src/seeds/url.seed.cli.entry.ts"
   },
   "imports": {
     "@config/*": {
@@ -36,8 +41,11 @@
   "dependencies": {
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
+    "pg": "^8.20.0",
+    "reflect-metadata": "^0.2.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "typeorm": "^0.3.28",
     "zod": "^4.1.12"
   },
   "devDependencies": {

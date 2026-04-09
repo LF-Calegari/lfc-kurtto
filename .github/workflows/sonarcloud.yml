@@ -34,6 +34,7 @@ jobs:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: kurtto
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/kurtto
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,6 +49,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Run database migrations
+        run: npm run migration:run
 
       - name: Run lint
         run: npm run lint
@@ -73,3 +77,4 @@ jobs:
             -Dsonar.tests=test
             -Dsonar.test.inclusions=**/*.test.ts
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.coverage.exclusions=**/migrations/**

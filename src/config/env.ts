@@ -8,6 +8,7 @@ const envSchema = z.object({
     .enum(['development', 'test', 'production'])
     .default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
+  DATABASE_URL: z.string().min(1).optional(),
   DB_HOST: z.string().min(1).default('db'),
   DB_PORT: z.coerce.number().int().positive().default(5432),
   DB_USER: z.string().min(1).default('postgres'),
