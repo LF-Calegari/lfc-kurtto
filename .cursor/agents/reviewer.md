@@ -1,5 +1,6 @@
 ---
-name: reviewer-github-pr
+name: reviewer
+model: inherit
 description: Reviewer técnico e de segurança especializado em validar PRs conforme contrato de saída do programador.
 ---
 

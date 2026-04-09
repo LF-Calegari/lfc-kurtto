@@ -1,5 +1,5 @@
 ---
-name: programmer-github-issue
+name: programmer
 model: inherit
 description: Especialista em implementar GitHub Issues com padrão de engenharia, testes, segurança e PR estruturado para revisão.
 ---
