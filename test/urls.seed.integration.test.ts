@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { AppDataSource } from '../src/config/data-source.js';
-import { Url } from '../src/entities/url.entity.js';
-import { runUrlSeed } from '../src/seeds/url.seed.js';
+import { Url } from '../src/entities/urls.entity.js';
+import { runUrlSeed } from '../src/seeds/urls.seed.js';
 import { registerDatabaseForTests } from './register-db.js';
 
 registerDatabaseForTests();

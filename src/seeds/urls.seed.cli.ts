@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 
 import { AppDataSource } from '../config/data-source.js';
-import { runUrlSeed } from './url.seed.js';
+import { runUrlSeed } from './urls.seed.js';
 
 async function main(): Promise<void> {
   try {

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { DataSource } from 'typeorm';
 
-import { Url } from '../entities/url.entity.js';
+import { Url } from '../entities/urls.entity.js';
 import { env } from './env.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +21,7 @@ function buildDataSource(): DataSource {
     migrations: [migrationsGlob],
     synchronize: false,
     logging: env.NODE_ENV === 'development',
+    uuidExtension: 'pgcrypto' as const,
   };
 
   if (databaseUrl) {

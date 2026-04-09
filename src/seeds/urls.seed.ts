@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 
 import { AppDataSource } from '../config/data-source.js';
-import { Url } from '../entities/url.entity.js';
+import { Url } from '../entities/urls.entity.js';
 
 const expiredAt = new Date('2020-01-01T00:00:00.000Z');
 
