@@ -102,6 +102,7 @@ Substitua pelo script real do `package.json` (ex.: `migration:run`, `typeorm:mig
 
 - Criar ou ajustar testes (Jest, Vitest, Node test runner, etc., conforme o projeto)
 - Priorizar integração quando houver múltiplas camadas ou PostgreSQL
+- Executar checagens e testes preferencialmente via Docker usando imagens compatíveis com o projeto (versão de Node, banco e serviços do `docker-compose.yml`)
 - Cobrir:
   - fluxo principal
   - erro

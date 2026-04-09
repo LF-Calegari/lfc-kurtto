@@ -197,6 +197,7 @@ Se existir → detalhar exploração
 - Existem?
 - São relevantes (unitário / integração com stack real ou mocks adequados)?
 - Cobrem erro e contrato?
+- Evidências de testes e checagens foram executadas via Docker com imagens compatíveis com o projeto?
 
 Se não → BLOCKER
 
@@ -209,6 +210,7 @@ Antes de aprovar, verificar CI ou evidências no PR:
 - **lint** (`npm run lint` ou equivalente)
 - **typecheck** (`tsc --noEmit`, `npm run build`, ou script do projeto)
 - **testes** (`npm test` ou equivalente)
+- Quando rodado localmente, priorizar execução em Docker/Compose com imagens compatíveis ao projeto
 
 Falha silenciosa ou ausência de pipeline quando o repositório exige → NEEDS IMPROVEMENT ou BLOCKER conforme gravidade.
 
