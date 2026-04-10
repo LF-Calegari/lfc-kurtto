@@ -32,6 +32,16 @@ do tempo.
 
 API disponivel em `http://localhost:3000/api/v1`.
 
+## Endpoints (API v1)
+
+| Metodo | Caminho | Descricao |
+| ------ | ------- | --------- |
+| `POST` | `/api/v1/urls` | Cria link encurtado (`201` com `short_url` a partir de `BASE_URL`; `409` se `custom_code` duplicado; `422` em validacao). |
+| `GET` | `/api/v1/urls` | Lista paginada (`page` padrao 1, `limit` padrao 10, max 100; `active` opcional `true`/`false`; meta `page`, `limit`, `total`, `total_pages`; ordenacao `created_at` DESC). |
+| `GET` | `/api/v1/urls/:code` | Detalhe por `short_code` (`200` ou `404` URL not found). |
+| `PATCH` | `/api/v1/urls/:code` | Atualizacao parcial (sem `short_code`/`clicks`; `404` se inexistente). |
+| `DELETE` | `/api/v1/urls/:code` | Remocao fisica (`204` ou `404`). |
+
 ## Scripts
 
 - `npm run dev`: inicia ambiente de desenvolvimento com watch e debug.

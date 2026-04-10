@@ -48,6 +48,8 @@ const seedRows: UrlSeedRow[] = [
   },
 ];
 
+export const urlSeedShortCodes: string[] = seedRows.map((row) => row.shortCode);
+
 export async function runUrlSeed(): Promise<void> {
   const repo = AppDataSource.getRepository(Url);
 

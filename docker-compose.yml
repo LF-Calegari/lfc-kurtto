@@ -25,6 +25,8 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${PORT:-3000}
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
+      SHORT_CODE_LENGTH: ${SHORT_CODE_LENGTH:-7}
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-kurtto}
       DB_HOST: db
       DB_PORT: 5432
@@ -49,12 +51,17 @@ services:
     environment:
       NODE_ENV: test
       PORT: 3000
+      BASE_URL: http://localhost:3000
+      SHORT_CODE_LENGTH: 7
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-kurtto}
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       DB_NAME: ${DB_NAME:-kurtto}
+    volumes:
+      - .:/app
+      - /app/node_modules
     command: ["npm", "run", "test"]
 
 volumes:
