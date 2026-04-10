@@ -79,3 +79,14 @@ export async function hardDeleteUrlByShortCode(
   const result = await repo.delete({ shortCode });
   return (result.affected ?? 0) > 0;
 }
+
+/** Atomic `clicks = clicks + 1` for active (non-soft-deleted) rows. */
+export async function incrementClicksAtomic(shortCode: string): Promise<void> {
+  await AppDataSource.query(
+    [
+      'UPDATE urls SET clicks = clicks + 1',
+      'WHERE short_code = $1 AND deleted_at IS NULL',
+    ].join(' '),
+    [shortCode],
+  );
+}
