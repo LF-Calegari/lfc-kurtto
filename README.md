@@ -112,6 +112,26 @@ Executar testes via profile:
 docker compose --profile test run --rm test
 ```
 
+## Seguranca
+
+- **Helmet**: cabecalhos HTTP de seguranca com configuracao padrao em todas as respostas.
+- **CORS**: em `development` e `test`, sem `CORS_ORIGINS`, qualquer origem e aceita (`*`). Em `production`, defina `CORS_ORIGINS` como lista CSV (ex.: `https://app.exemplo.com,https://admin.exemplo.com`). Metodos permitidos: `GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS`. Cabecalhos permitidos: `Content-Type`, `Authorization`.
+- **Rate limiting** (`express-rate-limit`, armazenamento em memoria por processo):
+  - Global: `RATE_LIMIT_GLOBAL_MAX` requisicoes por `RATE_LIMIT_GLOBAL_WINDOW_MS` (padrao **100 / 15 min**). Cabecalhos `RateLimit-*` habilitados; cabecalhos legados `X-RateLimit-*` desligados.
+  - `POST /api/v1/urls`: padrao **10 / 15 min** (`RATE_LIMIT_POST_URLS_*`).
+  - `GET /:code` (redirect publico): padrao **60 / 1 min** (`RATE_LIMIT_REDIRECT_*`).
+  - Resposta **429** com corpo JSON: `error`, `message`, `retry_after` (segundos ate a janela resetar).
+  - Em ambientes com varias replicas, o limite nao e compartilhado; para limite global consistente, avalie store externo (ex.: Redis) em evolucao futura.
+- **Sanitizacao de body**: `trim` em strings; remocao de tags HTML em campos textuais, exceto `originalUrl` / `original_url` (apenas trim, para nao corromper URLs).
+
+Testar CORS localmente (exemplo):
+
+```bash
+curl -sI -X OPTIONS "http://localhost:3000/api/v1/urls" \
+  -H "Origin: http://localhost:5173" \
+  -H "Access-Control-Request-Method: POST"
+```
+
 ## CI SonarCloud
 
 O workflow `.github/workflows/sonarcloud.yml` executa em `push` e `pull_request` nas branches `main` e `development`.
