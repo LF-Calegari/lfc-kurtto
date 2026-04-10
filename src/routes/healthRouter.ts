@@ -25,6 +25,23 @@ const healthRouter = Router();
  *                 message:
  *                   type: string
  *                   example: API is running
+ *                 database:
+ *                   type: string
+ *                   enum: [connected, disconnected]
+ *                   example: connected
+ *       503:
+ *         description: API degradada (banco indisponivel)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: degraded
+ *                 database:
+ *                   type: string
+ *                   example: disconnected
  */
 healthRouter.get(
   '/',

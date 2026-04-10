@@ -3,6 +3,8 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -14,8 +16,13 @@
     "paths": {
       "@config/*": ["./src/config/*.ts"],
       "@controllers/*": ["./src/controllers/*.ts"],
+      "@dtos/*": ["./src/dtos/*.ts"],
+      "@entities/*": ["./src/entities/*.ts"],
       "@middlewares/*": ["./src/middlewares/*.ts"],
-      "@routes/*": ["./src/routes/*.ts"]
+      "@repositories/*": ["./src/repositories/*.ts"],
+      "@routes/*": ["./src/routes/*.ts"],
+      "@services/*": ["./src/services/*.ts"],
+      "@utils/*": ["./src/utils/*.ts"]
     },
     "types": ["node"]
   },

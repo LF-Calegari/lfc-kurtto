@@ -1,5 +1,6 @@
+import 'reflect-metadata';
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { mock } from 'node:test';
 
 import express from 'express';
 import request from 'supertest';
@@ -7,16 +8,58 @@ import request from 'supertest';
 import app from '../src/app.js';
 import { env } from '../src/config/env.js';
 import errorHandler from '../src/middlewares/errorHandler.js';
+import { registerDatabaseForTests } from './register-db.js';
+
+registerDatabaseForTests();
 
 test('GET /api/v1/health returns 200 with expected contract', async () => {
   const response = await request(app).get('/api/v1/health');
 
   assert.equal(response.status, 200);
   assert.equal(response.body.status, 'ok');
+  assert.equal(response.body.database, 'connected');
+  assert.equal(response.body.message, 'API is running');
   assert.equal(response.body.environment, 'test');
   assert.equal(typeof response.body.uptime, 'number');
   assert.ok(Number.isFinite(response.body.uptime));
   assert.ok(!Number.isNaN(Date.parse(response.body.timestamp)));
+});
+
+test('GET /api/v1/health returns 503 when SELECT 1 fails', async () => {
+  const { AppDataSource } = await import('../src/config/data-source.js');
+
+  const queryMock = mock.method(AppDataSource, 'query', async () => {
+    throw new Error('simulated query failure');
+  });
+
+  try {
+    const response = await request(app).get('/api/v1/health');
+
+    assert.equal(response.status, 503);
+    assert.equal(response.body.database, 'disconnected');
+    assert.equal(response.body.status, 'degraded');
+  } finally {
+    queryMock.mock.restore();
+  }
+});
+
+test('GET /api/v1/health returns 503 when database is down', async () => {
+  const { AppDataSource } = await import('../src/config/data-source.js');
+
+  await AppDataSource.destroy();
+
+  try {
+    const response = await request(app).get('/api/v1/health');
+
+    assert.equal(response.status, 503);
+    assert.equal(response.body.status, 'degraded');
+    assert.equal(response.body.database, 'disconnected');
+  } finally {
+    if (!AppDataSource.isInitialized) {
+      await AppDataSource.initialize();
+      await AppDataSource.runMigrations();
+    }
+  }
 });
 
 test('GET unknown route returns 404 contract', async () => {
