@@ -7,6 +7,7 @@ import request from 'supertest';
 
 import app from '../src/app.js';
 import { env } from '../src/config/env.js';
+import { logger } from '../src/config/logger.js';
 import errorHandler from '../src/middlewares/errorHandler.js';
 import { registerDatabaseForTests } from './register-db.js';
 
@@ -73,38 +74,31 @@ test('GET unknown route returns 404 contract', async () => {
 
 test('error handler returns 500 with details outside production', async () => {
   const errorApp = express();
-  const consoleErrorCalls: unknown[][] = [];
-  const originalConsoleError = console.error;
+  const errorSpy = mock.method(logger, 'error', () => {});
 
   errorApp.get('/boom', () => {
     throw new Error('boom');
   });
   errorApp.use(errorHandler);
 
-  console.error = (...args: unknown[]): void => {
-    consoleErrorCalls.push(args);
-  };
-
   try {
     const response = await request(errorApp).get('/boom');
 
     assert.equal(response.status, 500);
-    assert.deepEqual(response.body, {
-      message: 'Internal server error',
-      details: 'boom',
-    });
-    assert.equal(consoleErrorCalls.length, 1);
-    assert.equal(consoleErrorCalls[0][0], '[error]');
+    assert.equal(response.body.message, 'Internal server error');
+    assert.equal(response.body.details, 'boom');
+    assert.equal(typeof response.body.stack, 'string');
+    assert.ok(String(response.body.stack).includes('boom'));
+    assert.equal(errorSpy.mock.calls.length, 1);
   } finally {
-    console.error = originalConsoleError;
+    errorSpy.mock.restore();
   }
 });
 
 test('error handler omits details in production', async () => {
   const originalNodeEnv = env.NODE_ENV;
   const errorApp = express();
-  const consoleErrorCalls: unknown[][] = [];
-  const originalConsoleError = console.error;
+  const errorSpy = mock.method(logger, 'error', () => {});
 
   errorApp.get('/boom', () => {
     throw new Error('boom');
@@ -112,9 +106,6 @@ test('error handler omits details in production', async () => {
   errorApp.use(errorHandler);
 
   env.NODE_ENV = 'production';
-  console.error = (...args: unknown[]): void => {
-    consoleErrorCalls.push(args);
-  };
 
   try {
     const response = await request(errorApp).get('/boom');
@@ -123,10 +114,9 @@ test('error handler omits details in production', async () => {
     assert.deepEqual(response.body, {
       message: 'Internal server error',
     });
-    assert.equal(consoleErrorCalls.length, 1);
-    assert.equal(consoleErrorCalls[0][0], '[error]');
+    assert.equal(errorSpy.mock.calls.length, 1);
   } finally {
     env.NODE_ENV = originalNodeEnv;
-    console.error = originalConsoleError;
+    errorSpy.mock.restore();
   }
 });

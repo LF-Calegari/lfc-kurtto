@@ -1,6 +1,9 @@
 import { QueryFailedError } from 'typeorm';
 
 import { env } from '@config/env';
+import { logger } from '@config/logger';
+import { AppError } from '@errors/AppError';
+import { ConflictError } from '@errors/ConflictError';
 import type {
   CreateUrlDto,
   ListUrlsQueryDto,
@@ -62,9 +65,7 @@ export class UrlService {
     if (dto.customCode) {
       const taken = await findUrlByShortCode(dto.customCode);
       if (taken) {
-        const err = new Error('custom_code already exists');
-        (err as Error & { statusCode: number }).statusCode = 409;
-        throw err;
+        throw new ConflictError();
       }
       const entity = createUrlEntity({
         originalUrl: dto.originalUrl,
@@ -72,7 +73,8 @@ export class UrlService {
         expiresAt,
       });
       const saved = await saveUrl(entity);
-      console.info('[url] created with custom short_code', {
+      logger.info('created with custom short_code', {
+        context: 'url',
         id: saved.id,
         shortCode: saved.shortCode,
       });
@@ -88,7 +90,8 @@ export class UrlService {
       });
       try {
         const saved = await saveUrl(entity);
-        console.info('[url] created with generated short_code', {
+        logger.info('created with generated short_code', {
+          context: 'url',
           id: saved.id,
           shortCode: saved.shortCode,
           attempt: attempt + 1,
@@ -99,17 +102,13 @@ export class UrlService {
           continue;
         }
         if (isUniqueViolation(error)) {
-          const err = new Error('Could not generate a unique short code');
-          (err as Error & { statusCode: number }).statusCode = 500;
-          throw err;
+          throw new AppError('Could not generate a unique short code', 500);
         }
         throw error;
       }
     }
 
-    const err = new Error('Could not generate a unique short code');
-    (err as Error & { statusCode: number }).statusCode = 500;
-    throw err;
+    throw new AppError('Could not generate a unique short code', 500);
   }
 
   public async list(query: ListUrlsQueryDto): Promise<{
@@ -162,9 +161,13 @@ export class UrlService {
   public scheduleClickIncrement(shortCode: string): void {
     setImmediate(() => {
       void incrementClicksAtomic(shortCode).catch((error: unknown) => {
-        console.warn('[redirect] atomic click increment failed', {
+        logger.warn('atomic click increment failed', {
+          context: 'redirect',
           shortCode,
-          error,
+          error:
+            error instanceof Error
+              ? { message: error.message, name: error.name }
+              : String(error),
         });
       });
     });
@@ -187,7 +190,7 @@ export class UrlService {
     }
     const updated = await updateUrlByShortCode(shortCode, patch);
     if (updated) {
-      console.info('[url] patched', { shortCode, id: updated.id });
+      logger.info('patched', { context: 'url', shortCode, id: updated.id });
     }
     return updated;
   }
@@ -195,7 +198,7 @@ export class UrlService {
   public async remove(shortCode: string): Promise<boolean> {
     const removed = await hardDeleteUrlByShortCode(shortCode);
     if (removed) {
-      console.info('[url] hard deleted', { shortCode });
+      logger.info('hard deleted', { context: 'url', shortCode });
     }
     return removed;
   }

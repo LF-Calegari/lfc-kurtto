@@ -112,6 +112,33 @@ Executar testes via profile:
 docker compose --profile test run --rm test
 ```
 
+## Logging
+
+- **Winston** (`src/config/logger.ts`): em `production`, saida JSON no nivel **info** (ou `LOG_LEVEL`); timestamp em ISO; meta como `context` (ex.: `http`, `url`, `error`, `bootstrap`, `redirect`, `process`). Em `development` e `test`, formato colorido simples no nivel **debug** por padrao.
+- **Request log** (`src/middlewares/requestLogger.ts`): ao final da resposta, registra metodo, path, status e duracao em ms; **sem body**; nivel **info** se status &lt; 400, **warn** para 4xx, **error** para 5xx. Por padrao **nao** registra `GET /api/v1/health`; ajuste com `REQUEST_LOG_SKIP_PATHS` (CSV de paths; vazio desativa o filtro).
+- **Erros**: hierarquia em `src/errors/` (`AppError`, `NotFoundError`, `ConflictError`, `ValidationError`); `errorHandler` central trata `instanceof`, loga com Winston e inclui `stack` na resposta JSON apenas em ambiente nao produto para erros 500 nao operacionais.
+- **Processo**: `uncaughtException` e `unhandledRejection` em `src/server.ts` registram com Winston e encerram o processo com codigo 1.
+
+## Seguranca
+
+- **Helmet**: cabecalhos HTTP de seguranca com configuracao padrao em todas as respostas.
+- **CORS**: em `development` e `test`, sem `CORS_ORIGINS`, qualquer origem e aceita (`*`). Em `production`, defina `CORS_ORIGINS` como lista CSV (ex.: `https://app.exemplo.com,https://admin.exemplo.com`). Metodos permitidos: `GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS`. Cabecalhos permitidos: `Content-Type`, `Authorization`.
+- **Rate limiting** (`express-rate-limit`, armazenamento em memoria por processo):
+  - Global: `RATE_LIMIT_GLOBAL_MAX` requisicoes por `RATE_LIMIT_GLOBAL_WINDOW_MS` (padrao **100 / 15 min**). Cabecalhos `RateLimit-*` habilitados; cabecalhos legados `X-RateLimit-*` desligados.
+  - `POST /api/v1/urls`: padrao **10 / 15 min** (`RATE_LIMIT_POST_URLS_*`).
+  - `GET /:code` (redirect publico): padrao **60 / 1 min** (`RATE_LIMIT_REDIRECT_*`).
+  - Resposta **429** com corpo JSON: `error`, `message`, `retry_after` (segundos ate a janela resetar).
+  - Em ambientes com varias replicas, o limite nao e compartilhado; para limite global consistente, avalie store externo (ex.: Redis) em evolucao futura.
+- **Sanitizacao de body**: `trim` em strings; remocao de tags HTML em campos textuais, exceto `originalUrl` / `original_url` (apenas trim, para nao corromper URLs).
+
+Testar CORS localmente (exemplo):
+
+```bash
+curl -sI -X OPTIONS "http://localhost:3000/api/v1/urls" \
+  -H "Origin: http://localhost:5173" \
+  -H "Access-Control-Request-Method: POST"
+```
+
 ## CI SonarCloud
 
 O workflow `.github/workflows/sonarcloud.yml` executa em `push` e `pull_request` nas branches `main` e `development`.
@@ -137,6 +164,7 @@ Perfis VS Code disponiveis em `.vscode/launch.json`:
 src/
   config/
   controllers/
+  errors/
   entities/
   middlewares/
   migrations/
