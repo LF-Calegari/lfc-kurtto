@@ -3,8 +3,27 @@ import type { NextFunction, Request, Response } from 'express';
 /** Campos que representam URL bruta: apenas trim, sem remocao de tags HTML. */
 const URL_BODY_KEYS = new Set(['originalUrl', 'original_url']);
 
+/**
+ * Remove trechos `<` até o próximo `>` (equivalente a `<[^>]*>`), sem regex — evita ReDoS (Sonar S5852).
+ */
 function stripHtmlTags(value: string): string {
-  return value.replace(/<[^>]*>/g, '');
+  let result = '';
+  let i = 0;
+  while (i < value.length) {
+    const ch = value[i];
+    if (ch === '<') {
+      const close = value.indexOf('>', i + 1);
+      if (close === -1) {
+        result += value.slice(i);
+        break;
+      }
+      i = close + 1;
+      continue;
+    }
+    result += ch;
+    i += 1;
+  }
+  return result;
 }
 
 function sanitizeStringField(key: string, value: string): string {
