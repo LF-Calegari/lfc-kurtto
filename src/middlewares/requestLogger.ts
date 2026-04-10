@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 
 import { env } from '@config/env';
 import { logger } from '@config/logger';
+import { HttpStatusCode } from '@utils/HttpStatusCode';
 
 function normalizePath(req: Request): string {
   const raw = req.originalUrl ?? req.url ?? req.path;
@@ -39,9 +40,9 @@ export function requestLogger(
       status,
       ms,
     };
-    if (status >= 500) {
+    if (status >= HttpStatusCode.INTERNAL_SERVER_ERROR) {
       logger.error(message, meta);
-    } else if (status >= 400) {
+    } else if (status >= HttpStatusCode.BAD_REQUEST) {
       logger.warn(message, meta);
     } else {
       logger.info(message, meta);

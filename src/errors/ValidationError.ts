@@ -1,3 +1,5 @@
+import { HttpStatusCode } from '@utils/HttpStatusCode';
+
 import { AppError } from './AppError.js';
 
 export type ValidationErrorBody = {
@@ -9,7 +11,7 @@ export class ValidationError extends AppError {
   readonly body: ValidationErrorBody;
 
   constructor(body: ValidationErrorBody) {
-    super(body.error, 422);
+    super(body.error, HttpStatusCode.UNPROCESSABLE_ENTITY);
     this.name = 'ValidationError';
     this.body = body;
   }

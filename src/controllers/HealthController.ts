@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 
 import { AppDataSource } from '@config/data-source';
 import { env } from '@config/env';
+import { HttpStatusCode } from '@utils/HttpStatusCode';
 
 class HealthController {
   private async resolveDatabaseStatus(): Promise<
@@ -27,16 +28,20 @@ class HealthController {
       const database = await this.resolveDatabaseStatus();
       const degraded = database === 'disconnected';
 
-      res.status(degraded ? 503 : 200).json({
-        status: degraded ? 'degraded' : 'ok',
-        message: degraded
-          ? 'API is running but database is unavailable'
-          : 'API is running',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        environment: env.NODE_ENV,
-        database,
-      });
+      res
+        .status(
+          degraded ? HttpStatusCode.SERVICE_UNAVAILABLE : HttpStatusCode.OK,
+        )
+        .json({
+          status: degraded ? 'degraded' : 'ok',
+          message: degraded
+            ? 'API is running but database is unavailable'
+            : 'API is running',
+          timestamp: new Date().toISOString(),
+          uptime: process.uptime(),
+          environment: env.NODE_ENV,
+          database,
+        });
     } catch (error) {
       next(error);
     }

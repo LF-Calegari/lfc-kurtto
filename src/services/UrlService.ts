@@ -19,6 +19,7 @@ import {
   saveUrl,
   updateUrlByShortCode,
 } from '@repositories/UrlRepository';
+import { HttpStatusCode } from '@utils/HttpStatusCode';
 import { generateShortCode } from '@utils/shortCode';
 
 const MAX_SHORT_CODE_ATTEMPTS = 5;
@@ -102,13 +103,19 @@ export class UrlService {
           continue;
         }
         if (isUniqueViolation(error)) {
-          throw new AppError('Could not generate a unique short code', 500);
+          throw new AppError(
+            'Could not generate a unique short code',
+            HttpStatusCode.INTERNAL_SERVER_ERROR,
+          );
         }
         throw error;
       }
     }
 
-    throw new AppError('Could not generate a unique short code', 500);
+    throw new AppError(
+      'Could not generate a unique short code',
+      HttpStatusCode.INTERNAL_SERVER_ERROR,
+    );
   }
 
   public async list(query: ListUrlsQueryDto): Promise<{

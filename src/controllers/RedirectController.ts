@@ -4,6 +4,7 @@ import { logger } from '@config/logger';
 import { AppError } from '@errors/AppError';
 import { NotFoundError } from '@errors/NotFoundError';
 import urlService from '@services/UrlService';
+import { HttpStatusCode } from '@utils/HttpStatusCode';
 
 const CACHE_CONTROL = 'no-cache, no-store, must-revalidate';
 
@@ -27,10 +28,16 @@ class RedirectController {
       throw new NotFoundError('URL not found');
     }
     if (result.outcome === 'gone_inactive') {
-      throw new AppError('This short link is inactive.', 410);
+      throw new AppError(
+        'This short link is inactive.',
+        HttpStatusCode.GONE,
+      );
     }
     if (result.outcome === 'gone_expired') {
-      throw new AppError('This short link has expired.', 410);
+      throw new AppError(
+        'This short link has expired.',
+        HttpStatusCode.GONE,
+      );
     }
 
     logger.info(`${req.method} /${code} redirect`, {
@@ -38,7 +45,7 @@ class RedirectController {
       shortCode: code,
     });
     res.setHeader('Cache-Control', CACHE_CONTROL);
-    res.redirect(302, result.originalUrl);
+    res.redirect(HttpStatusCode.FOUND, result.originalUrl);
     urlService.scheduleClickIncrement(code);
   }
 }

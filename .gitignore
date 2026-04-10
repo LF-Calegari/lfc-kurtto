@@ -287,8 +287,8 @@ dist
 *tmpfile
 *tmpfiles
 *lol
-!test/
-!test/**/*.ts
+!tests/
+!tests/**/*.ts
 
 ### VisualStudioCode ###
 .vscode/*
