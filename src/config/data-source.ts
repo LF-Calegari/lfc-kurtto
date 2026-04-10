@@ -12,6 +12,10 @@ const __dirname = path.dirname(__filename);
 
 const migrationsGlob = path.join(__dirname, '../migrations/*{.ts,.js}');
 
+/** Jest + ESM loads migration TS via eval; skip metadata load inside the runner. */
+const migrationPaths =
+  process.env.JEST_WORKER_ID !== undefined ? [] : [migrationsGlob];
+
 export type CreateAppDataSourceOptions = {
   /**
    * When defined, overrides how `DATABASE_URL` from env is applied.
@@ -31,7 +35,7 @@ export function createAppDataSource(
   const common = {
     type: 'postgres' as const,
     entities: [Url],
-    migrations: [migrationsGlob],
+    migrations: migrationPaths,
     synchronize: false,
     logging: env.NODE_ENV === 'development',
     uuidExtension: 'pgcrypto' as const,

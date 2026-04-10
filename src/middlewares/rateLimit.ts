@@ -5,6 +5,7 @@ import rateLimit, {
 } from 'express-rate-limit';
 
 import { env } from '@config/env';
+import { HttpStatusCode } from '@utils/HttpStatusCode';
 
 const skipOptions: Options['skip'] = (req: Request) => req.method === 'OPTIONS';
 
@@ -33,7 +34,7 @@ export const rateLimitJsonHandler: RateLimitExceededEventHandler = (
     typeof optionsUsed.message === 'string'
       ? optionsUsed.message
       : rateLimitMessage;
-  res.status(429).json({
+  res.status(HttpStatusCode.TOO_MANY_REQUESTS).json({
     error: 'too_many_requests',
     message,
     retry_after: retryAfterSeconds,

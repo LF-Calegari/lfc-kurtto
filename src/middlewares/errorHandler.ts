@@ -4,6 +4,7 @@ import { env } from '@config/env';
 import { logger } from '@config/logger';
 import { AppError } from '@errors/AppError';
 import { ValidationError } from '@errors/ValidationError';
+import { HttpStatusCode } from '@utils/HttpStatusCode';
 
 const errorHandler: ErrorRequestHandler = (err, req, res, _next): void => {
   const isProduction = env.NODE_ENV === 'production';
@@ -11,16 +12,19 @@ const errorHandler: ErrorRequestHandler = (err, req, res, _next): void => {
   if (err instanceof ValidationError) {
     logger.warn(err.message, {
       context: 'error',
-      statusCode: 422,
+      statusCode: HttpStatusCode.UNPROCESSABLE_ENTITY,
       path: req.originalUrl,
       method: req.method,
     });
-    res.status(422).json(err.body);
+    res.status(HttpStatusCode.UNPROCESSABLE_ENTITY).json(err.body);
     return;
   }
 
   if (err instanceof AppError) {
-    const log = err.statusCode >= 500 ? logger.error : logger.warn;
+    const log =
+      err.statusCode >= HttpStatusCode.INTERNAL_SERVER_ERROR
+        ? logger.error
+        : logger.warn;
     log(err.message, {
       context: 'error',
       statusCode: err.statusCode,
@@ -30,7 +34,11 @@ const errorHandler: ErrorRequestHandler = (err, req, res, _next): void => {
     });
 
     const body: Record<string, unknown> = { message: err.message };
-    if (!isProduction && err.statusCode >= 500 && err.stack) {
+    if (
+      !isProduction &&
+      err.statusCode >= HttpStatusCode.INTERNAL_SERVER_ERROR &&
+      err.stack
+    ) {
       body.stack = err.stack;
     }
     res.status(err.statusCode).json(body);
@@ -41,7 +49,7 @@ const errorHandler: ErrorRequestHandler = (err, req, res, _next): void => {
   const msg = err instanceof Error ? err.message : String(err);
   logger.error('Internal server error', {
     context: 'error',
-    statusCode: 500,
+    statusCode: HttpStatusCode.INTERNAL_SERVER_ERROR,
     path: req.originalUrl,
     method: req.method,
     message: msg,
@@ -55,7 +63,7 @@ const errorHandler: ErrorRequestHandler = (err, req, res, _next): void => {
     body.details = err.message;
     body.stack = err.stack;
   }
-  res.status(500).json(body);
+  res.status(HttpStatusCode.INTERNAL_SERVER_ERROR).json(body);
 };
 
 export default errorHandler;
