@@ -33,6 +33,10 @@
       "source": "./src/dtos/*.ts",
       "default": "./dist/dtos/*.js"
     },
+    "@errors/*": {
+      "source": "./src/errors/*.ts",
+      "default": "./dist/errors/*.js"
+    },
     "@entities/*": {
       "source": "./src/entities/*.ts",
       "default": "./dist/entities/*.js"
@@ -70,6 +74,7 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "typeorm": "^0.3.28",
+    "winston": "^3.19.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {

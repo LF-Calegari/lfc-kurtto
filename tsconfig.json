@@ -17,6 +17,7 @@
       "@config/*": ["./src/config/*.ts"],
       "@controllers/*": ["./src/controllers/*.ts"],
       "@dtos/*": ["./src/dtos/*.ts"],
+      "@errors/*": ["./src/errors/*.ts"],
       "@entities/*": ["./src/entities/*.ts"],
       "@middlewares/*": ["./src/middlewares/*.ts"],
       "@repositories/*": ["./src/repositories/*.ts"],

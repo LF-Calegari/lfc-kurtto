@@ -11,23 +11,29 @@ urlRouter.post(
   '/',
   postUrlsRateLimiter,
   validateBody(CreateUrlSchema),
-  (req, res, next) => urlController.create(req, res, next),
+  (req, res, next) => {
+    void urlController.create(req, res).catch(next);
+  },
 );
 
-urlRouter.get('/', (req, res, next) => urlController.list(req, res, next));
+urlRouter.get('/', (req, res, next) => {
+  void urlController.list(req, res).catch(next);
+});
 
-urlRouter.get('/:code', (req, res, next) =>
-  urlController.getByCode(req, res, next),
-);
+urlRouter.get('/:code', (req, res, next) => {
+  void urlController.getByCode(req, res).catch(next);
+});
 
 urlRouter.patch(
   '/:code',
   validateBody(PatchUrlSchema),
-  (req, res, next) => urlController.patch(req, res, next),
+  (req, res, next) => {
+    void urlController.patch(req, res).catch(next);
+  },
 );
 
-urlRouter.delete('/:code', (req, res, next) =>
-  urlController.remove(req, res, next),
-);
+urlRouter.delete('/:code', (req, res, next) => {
+  void urlController.remove(req, res).catch(next);
+});
 
 export default urlRouter;

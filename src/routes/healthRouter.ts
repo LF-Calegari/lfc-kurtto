@@ -43,9 +43,8 @@ const healthRouter = Router();
  *                   type: string
  *                   example: disconnected
  */
-healthRouter.get(
-  '/',
-  (req, res, next) => healthController.check(req, res, next),
-);
+healthRouter.get('/', (req, res, next) => {
+  void healthController.check(req, res, next).catch(next);
+});
 
 export default healthRouter;

@@ -1,6 +1,8 @@
 import { NextFunction, Request, Response } from 'express';
 import { ZodError, type ZodType } from 'zod';
 
+import { ValidationError } from '@errors/ValidationError';
+
 export function zodErrorResponse(error: ZodError): {
   error: string;
   details: { field: string; message: string }[];
@@ -18,7 +20,7 @@ export function validateBody<T>(schema: ZodType<T>) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(422).json(zodErrorResponse(parsed.error));
+      next(new ValidationError(zodErrorResponse(parsed.error)));
       return;
     }
     req.body = parsed.data;
