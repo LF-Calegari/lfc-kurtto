@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import urlController from '@controllers/UrlController';
+import { postUrlsRateLimiter } from '@middlewares/rateLimit';
 import { validateBody } from '@middlewares/validate';
 import { CreateUrlSchema, PatchUrlSchema } from '../dtos/UrlDto.js';
 
@@ -8,6 +9,7 @@ const urlRouter = Router();
 
 urlRouter.post(
   '/',
+  postUrlsRateLimiter,
   validateBody(CreateUrlSchema),
   (req, res, next) => urlController.create(req, res, next),
 );
