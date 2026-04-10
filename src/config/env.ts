@@ -60,6 +60,14 @@ const envSchema = z
       .int()
       .positive()
       .default(ONE_MIN_MS),
+    LOG_LEVEL: z
+      .enum(['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'])
+      .optional(),
+    /**
+     * CSV de paths (path sem query) para nao registrar request log em GET.
+     * Vazio = nao ignorar nenhuma rota. Ausente = padrao /api/v1/health.
+     */
+    REQUEST_LOG_SKIP_PATHS: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production' && !data.CORS_ORIGINS?.trim()) {
@@ -69,6 +77,16 @@ const envSchema = z
         path: ['CORS_ORIGINS'],
       });
     }
+  })
+  .transform((data) => {
+    const raw = data.REQUEST_LOG_SKIP_PATHS;
+    const requestLogSkipPaths =
+      raw === undefined
+        ? ['/api/v1/health']
+        : raw.trim() === ''
+          ? []
+          : raw.split(',').map((s) => s.trim()).filter(Boolean);
+    return { ...data, requestLogSkipPaths };
   });
 
 const parsedEnv = envSchema.safeParse(process.env);

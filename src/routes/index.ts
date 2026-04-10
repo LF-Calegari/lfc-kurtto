@@ -14,9 +14,9 @@ const routes = (app: Express): void => {
   apiRouter.use('/urls', urlRouter);
 
   app.use('/api/v1', apiRouter);
-  app.get('/:code', redirectRateLimiter, (req, res, next) =>
-    redirectController.handle(req, res, next),
-  );
+  app.get('/:code', redirectRateLimiter, (req, res, next) => {
+    void redirectController.handle(req, res).catch(next);
+  });
 };
 
 export default routes;

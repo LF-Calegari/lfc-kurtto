@@ -112,6 +112,13 @@ Executar testes via profile:
 docker compose --profile test run --rm test
 ```
 
+## Logging
+
+- **Winston** (`src/config/logger.ts`): em `production`, saida JSON no nivel **info** (ou `LOG_LEVEL`); timestamp em ISO; meta como `context` (ex.: `http`, `url`, `error`, `bootstrap`, `redirect`, `process`). Em `development` e `test`, formato colorido simples no nivel **debug** por padrao.
+- **Request log** (`src/middlewares/requestLogger.ts`): ao final da resposta, registra metodo, path, status e duracao em ms; **sem body**; nivel **info** se status &lt; 400, **warn** para 4xx, **error** para 5xx. Por padrao **nao** registra `GET /api/v1/health`; ajuste com `REQUEST_LOG_SKIP_PATHS` (CSV de paths; vazio desativa o filtro).
+- **Erros**: hierarquia em `src/errors/` (`AppError`, `NotFoundError`, `ConflictError`, `ValidationError`); `errorHandler` central trata `instanceof`, loga com Winston e inclui `stack` na resposta JSON apenas em ambiente nao produto para erros 500 nao operacionais.
+- **Processo**: `uncaughtException` e `unhandledRejection` em `src/server.ts` registram com Winston e encerram o processo com codigo 1.
+
 ## Seguranca
 
 - **Helmet**: cabecalhos HTTP de seguranca com configuracao padrao em todas as respostas.
@@ -157,6 +164,7 @@ Perfis VS Code disponiveis em `.vscode/launch.json`:
 src/
   config/
   controllers/
+  errors/
   entities/
   middlewares/
   migrations/
