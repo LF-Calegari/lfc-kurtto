@@ -32,10 +32,23 @@ do tempo.
 
 API disponivel em `http://localhost:3000/api/v1`.
 
+## Link curto na raiz (redirecionamento)
+
+Rotas versionadas ficam em `/api/v1`. O acesso publico ao link curto usa **`GET /:code`** na raiz do host (ex.: `https://seu-dominio/abc12xY`), registrado **depois** de `app.use('/api/v1', ...)` para nao capturar caminhos da API.
+
+Fluxo:
+
+1. Cliente solicita `GET /{short_code}`.
+2. Se o codigo existir, estiver ativo e nao expirado: resposta **`302 Found`** com cabecalho **`Location`** apontando para a `original_url`, **`Cache-Control: no-cache, no-store, must-revalidate`**, e incremento atomico de `clicks` de forma assincrona apos o envio da resposta (falhas no incremento sao registradas em log, sem afetar o redirect).
+3. Codigo inexistente: **`404`** JSON (`URL not found`).
+4. Link inativo: **`410 Gone`** JSON (mensagem distinta de expirado).
+5. Link expirado: persiste `is_active = false`, **`410 Gone`** JSON (mensagem distinta de inativo).
+
 ## Endpoints (API v1)
 
 | Metodo | Caminho | Descricao |
 | ------ | ------- | --------- |
+| `GET` | `/:code` | Redirecionamento publico para `original_url` (`302` + cache desabilitado; `404` / `410` conforme regras acima). |
 | `POST` | `/api/v1/urls` | Cria link encurtado (`201` com `short_url` a partir de `BASE_URL`; `409` se `custom_code` duplicado; `422` em validacao). |
 | `GET` | `/api/v1/urls` | Lista paginada (`page` padrao 1, `limit` padrao 10, max 100; `active` opcional `true`/`false`; meta `page`, `limit`, `total`, `total_pages`; ordenacao `created_at` DESC). |
 | `GET` | `/api/v1/urls/:code` | Detalhe por `short_code` (`200` ou `404` URL not found). |

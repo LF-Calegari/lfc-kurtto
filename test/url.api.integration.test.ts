@@ -4,10 +4,29 @@ import test from 'node:test';
 
 import request from 'supertest';
 
+import { AppDataSource } from '../src/config/data-source.js';
+import { Url } from '../src/entities/Url.js';
 import app from '../src/app.js';
 import { registerDatabaseForTests } from './register-db.js';
 
 registerDatabaseForTests();
+
+async function waitForClicks(
+  shortCode: string,
+  minClicks: number,
+): Promise<void> {
+  for (let i = 0; i < 50; i++) {
+    const res = await request(app).get(`/api/v1/urls/${shortCode}`);
+    assert.equal(res.status, 200);
+    if (res.body.clicks >= minClicks) {
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 20);
+    });
+  }
+  assert.fail(`clicks did not reach ${minClicks} for ${shortCode}`);
+}
 
 const futureIso = (): string => {
   const d = new Date();
@@ -168,4 +187,66 @@ test('POST /api/v1/urls accepts optional future expiresAt', async () => {
   });
   assert.equal(res.status, 201);
   assert.ok(res.body.expiresAt);
+});
+
+test('GET /:code: 302, cache headers, async click increment', async () => {
+  const code = `r${Date.now().toString(36)}`.slice(0, 10);
+  const create = await request(app).post('/api/v1/urls').send({
+    originalUrl: 'https://redirect.example.com/path',
+    customCode: code,
+  });
+  assert.equal(create.status, 201);
+  assert.equal(create.body.clicks, 0);
+
+  const redir = await request(app).get(`/${code}`).redirects(0);
+  assert.equal(redir.status, 302);
+  assert.equal(redir.headers.location, 'https://redirect.example.com/path');
+  const cache = String(redir.headers['cache-control'] ?? '');
+  assert.match(cache, /no-cache/i);
+  assert.match(cache, /no-store/i);
+  assert.match(cache, /must-revalidate/i);
+
+  await waitForClicks(code, 1);
+});
+
+test('GET /:code returns 404 when short code missing', async () => {
+  const res = await request(app).get('/zzzzzzzzzz').redirects(0);
+  assert.equal(res.status, 404);
+  assert.equal(res.body.message, 'URL not found');
+});
+
+test('GET /:code returns 410 when inactive', async () => {
+  const code = `i${Date.now().toString(36)}`.slice(0, 10);
+  await request(app).post('/api/v1/urls').send({
+    originalUrl: 'https://inactive-redirect.example.com',
+    customCode: code,
+  });
+  await request(app).patch(`/api/v1/urls/${code}`).send({ isActive: false });
+
+  const res = await request(app).get(`/${code}`).redirects(0);
+  assert.equal(res.status, 410);
+  assert.equal(res.body.message, 'This short link is inactive.');
+});
+
+test('GET /:code returns 410 when expired and deactivates row', async () => {
+  const code = `x${Date.now().toString(36)}`.slice(0, 10);
+  await request(app).post('/api/v1/urls').send({
+    originalUrl: 'https://expired-redirect.example.com',
+    customCode: code,
+    expiresAt: futureIso(),
+  });
+
+  const past = new Date('2000-01-01T00:00:00.000Z');
+  await AppDataSource.getRepository(Url).update(
+    { shortCode: code },
+    { expiresAt: past },
+  );
+
+  const res = await request(app).get(`/${code}`).redirects(0);
+  assert.equal(res.status, 410);
+  assert.equal(res.body.message, 'This short link has expired.');
+
+  const getOne = await request(app).get(`/api/v1/urls/${code}`);
+  assert.equal(getOne.status, 200);
+  assert.equal(getOne.body.isActive, false);
 });

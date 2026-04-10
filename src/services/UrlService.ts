@@ -11,6 +11,7 @@ import {
   createUrlEntity,
   findUrlByShortCode,
   hardDeleteUrlByShortCode,
+  incrementClicksAtomic,
   listUrls,
   saveUrl,
   updateUrlByShortCode,
@@ -32,6 +33,12 @@ function buildShortUrl(shortCode: string): string {
   const base = env.BASE_URL.replace(/\/$/, '');
   return `${base}/${shortCode}`;
 }
+
+export type RedirectResolution =
+  | { outcome: 'not_found' }
+  | { outcome: 'gone_inactive' }
+  | { outcome: 'gone_expired' }
+  | { outcome: 'redirect'; originalUrl: string };
 
 export function serializeUrl(url: Url): Record<string, unknown> {
   return {
@@ -134,6 +141,33 @@ export class UrlService {
 
   public async getByShortCode(shortCode: string): Promise<Url | null> {
     return findUrlByShortCode(shortCode);
+  }
+
+  public async resolveRedirect(shortCode: string): Promise<RedirectResolution> {
+    const url = await findUrlByShortCode(shortCode);
+    if (!url) {
+      return { outcome: 'not_found' };
+    }
+    const now = Date.now();
+    if (url.expiresAt !== null && url.expiresAt.getTime() <= now) {
+      await updateUrlByShortCode(shortCode, { isActive: false });
+      return { outcome: 'gone_expired' };
+    }
+    if (!url.isActive) {
+      return { outcome: 'gone_inactive' };
+    }
+    return { outcome: 'redirect', originalUrl: url.originalUrl };
+  }
+
+  public scheduleClickIncrement(shortCode: string): void {
+    setImmediate(() => {
+      void incrementClicksAtomic(shortCode).catch((error: unknown) => {
+        console.warn('[redirect] atomic click increment failed', {
+          shortCode,
+          error,
+        });
+      });
+    });
   }
 
   public async patch(shortCode: string, dto: PatchUrlDto): Promise<Url | null> {
