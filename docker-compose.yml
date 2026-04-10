@@ -65,7 +65,28 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
-    command: ["npm", "run", "test"]
+    command: ["sh", "-c", "npm run migration:run && npm run test"]
+
+  migrate:
+    profiles: ["migrate"]
+    build:
+      context: .
+      target: development
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-kurtto}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-kurtto}
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: ["npm", "run", "migration:run"]
 
 volumes:
   postgres_data:

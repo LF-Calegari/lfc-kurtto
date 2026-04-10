@@ -62,8 +62,9 @@ Fluxo:
 - `npm run start`: executa build em modo producao.
 - `npm run typecheck`: valida tipos sem gerar build.
 - `npm run lint`: executa lint do projeto.
-- `npm run test`: executa testes de integracao (requer PostgreSQL acessivel; veja secao **Banco e testes**).
-- `npm run test:coverage`: executa testes com geracao de cobertura `lcov` em `coverage/lcov.info`.
+- `npm run test`: executa a suite **Jest** (ESM + `ts-jest`; requer PostgreSQL com migrations aplicadas; veja **Testes** abaixo).
+- `npm run test:watch` / `npm run test:unit` / `npm run test:integration`: variantes Jest com `--runInBand --forceExit`.
+- `npm run test:coverage`: Jest com `--coverage`, relatorio `coverage/lcov.info` e thresholds globais (branches 70%; demais 80%).
 - `npm run typeorm`: atalho para a CLI do TypeORM via `tsx`.
 - `npm run migration:generate`: gera migration a partir do diff das entidades (executa `npm run build` antes; substitua `MigrationName` no script por um nome descritivo ou passe o caminho desejado; usa `dist/config/data-source.js` como DataSource).
 - `npm run migration:run` / `npm run migration:revert`: aplica ou reverte migrations usando `src/config/data-source.ts`.
@@ -77,9 +78,12 @@ Fluxo:
 - UUIDs na tabela `urls`: a migration define default `gen_random_uuid()`; o DataSource usa `uuidExtension: 'pgcrypto'` para alinhar ao TypeORM (o driver cria `CREATE EXTENSION IF NOT EXISTS pgcrypto` quando necessario). Em PostgreSQL 13+, `gen_random_uuid()` tambem esta disponivel no nucleo; manter `pgcrypto` e a escolha explicita do projeto para consistencia com o TypeORM.
 - Seeds de desenvolvimento: `npm run seed` (segunda execucao nao duplica por `short_code`).
 
-### Testes com PostgreSQL
+### Testes (Jest + Supertest)
 
-Os testes que exercitam health com banco e o seed assumem um Postgres acessivel. Exemplo com servico local na porta 5432:
+- Configuracao: `jest.config.ts`, `jest.setup.ts` (`reflect-metadata`), `tsconfig.jest.json`.
+- Pastas: `tests/unit` (*.spec.ts), `tests/integration` (*.spec.ts), helpers em `tests/helpers` (`env-test.ts` aplica `DATABASE_URL_TEST` sobre `DATABASE_URL` quando definido; `setup.ts` com `useIntegrationDatabase()` para integracao: `initialize` + `TRUNCATE urls` entre casos).
+- No processo Jest, o TypeORM **nao** carrega arquivos de migration via glob (evita conflito com VM modules); aplique migrations **antes** dos testes (`npm run migration:run`). O servico Docker de teste executa `migration:run && npm test` automaticamente.
+- Exemplo local (Postgres na porta 5432):
 
 ```bash
 export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/kurtto
@@ -87,7 +91,7 @@ npm run migration:run
 npm test
 ```
 
-No CI (SonarCloud), o workflow sobe Postgres 18 (imagem `postgres:18-alpine`), roda `migration:run` e em seguida lint, typecheck e testes.
+No CI (SonarCloud), o workflow sobe Postgres 18 (`postgres:18-alpine`), roda `migration:run` e em seguida lint, typecheck e `npm run test:coverage`.
 
 ## Docker
 
@@ -106,10 +110,16 @@ docker compose down -v
 
 > Atencao: o comando acima remove os dados locais do banco.
 
-Executar testes via profile:
+Executar testes via profile (aplica migrations e roda Jest):
 
 ```bash
 docker compose --profile test run --rm test
+```
+
+Aplicar migrations via profile dedicado:
+
+```bash
+docker compose --profile migrate run --rm migrate
 ```
 
 ## Logging
@@ -173,7 +183,10 @@ src/
   app.ts
   bootstrap.ts
   server.ts
-test/
+tests/
+  unit/
+  integration/
+  helpers/
 ```
 
 ## Licenca

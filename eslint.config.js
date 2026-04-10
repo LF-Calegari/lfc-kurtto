@@ -19,6 +19,14 @@ export default [
       },
     },
   },
+  {
+    files: ['tests/**/*.ts', 'jest.setup.ts', 'jest.config.ts'],
+    languageOptions: {
+      parserOptions: {
+        project: './tsconfig.jest.json',
+      },
+    },
+  },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   {
