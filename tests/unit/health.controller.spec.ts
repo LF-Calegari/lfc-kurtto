@@ -41,6 +41,28 @@ describe('HealthController.live', () => {
     expect(payload.status).toBe('alive');
     expect(Number.isNaN(Date.parse(String(payload.timestamp)))).toBe(false);
   });
+
+  it('forwards errors to next', async () => {
+    const expectedError = new Error('live failed');
+    const res = {
+      status() {
+        throw expectedError;
+      },
+      json() {
+        return this;
+      },
+    } as unknown as Response;
+
+    const nextCalls: unknown[] = [];
+    const next = jest.fn(((error?: unknown) => {
+      nextCalls.push(error);
+    })) as NextFunction;
+
+    await healthController.live({} as Request, res, next);
+
+    expect(nextCalls).toHaveLength(1);
+    expect(nextCalls[0]).toBe(expectedError);
+  });
 });
 
 describe('HealthController.ready', () => {
@@ -137,6 +159,28 @@ describe('HealthController.ready', () => {
     expect(payload.status).toBe('not_ready');
     expect(payload.database).toBe('connected');
     expect(payload.cache).toBe('disconnected');
+  });
+
+  it('forwards errors to next', async () => {
+    const expectedError = new Error('ready failed');
+    const res = {
+      status() {
+        throw expectedError;
+      },
+      json() {
+        return this;
+      },
+    } as unknown as Response;
+
+    const nextCalls: unknown[] = [];
+    const next = jest.fn(((error?: unknown) => {
+      nextCalls.push(error);
+    })) as NextFunction;
+
+    await healthController.ready({} as Request, res, next);
+
+    expect(nextCalls).toHaveLength(1);
+    expect(nextCalls[0]).toBe(expectedError);
   });
 });
 
