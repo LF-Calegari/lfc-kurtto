@@ -45,9 +45,9 @@ export function createAppDataSource(
 ): DataSource {
   const testDedicatedUrl = getIntegrationTestDatabaseUrl();
   const databaseUrl =
-    buildOptions?.databaseUrlOverride !== undefined
-      ? buildOptions.databaseUrlOverride.trim() || undefined
-      : testDedicatedUrl ?? env.DATABASE_URL?.trim();
+    buildOptions?.databaseUrlOverride === undefined
+      ? testDedicatedUrl ?? env.DATABASE_URL?.trim()
+      : buildOptions.databaseUrlOverride.trim() || undefined;
 
   const common = {
     type: 'postgres' as const,

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const CreateUrlSchema = z
   .object({
-    originalUrl: z.string().url(),
+    originalUrl: z.url(),
     customCode: z
       .string()
       .regex(/^[a-zA-Z0-9]{3,10}$/, {
@@ -26,7 +26,7 @@ export type CreateUrlDto = z.infer<typeof CreateUrlSchema>;
 
 export const PatchUrlSchema = z
   .object({
-    originalUrl: z.string().url().optional(),
+    originalUrl: z.url().optional(),
     expiresAt: z.coerce.date().optional(),
     isActive: z.boolean().optional(),
   })

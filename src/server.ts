@@ -30,15 +30,14 @@ process.on('unhandledRejection', (reason: unknown) => {
   process.exit(1);
 });
 
-void startApplication()
-  .then((server) => {
-    setupGracefulShutdown(server);
-  })
-  .catch((error: unknown) => {
-    logger.error('Failed to start application', {
-      context: 'bootstrap',
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    process.exit(1);
+try {
+  const server = await startApplication();
+  setupGracefulShutdown(server);
+} catch (error: unknown) {
+  logger.error('Failed to start application', {
+    context: 'bootstrap',
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
   });
+  process.exit(1);
+}
