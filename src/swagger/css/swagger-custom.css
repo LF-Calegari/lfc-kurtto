@@ -1,0 +1,220 @@
+/**
+ * Tema Swagger UI — kurtto (minimalista).
+ * Fontes e imagens referenciadas por URL relativa ao próprio CSS.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+
+.swagger-ui {
+  --kurtto-ember: #E8593C;
+  --kurtto-flame: #D14520;
+  --kurtto-ink: #1A1A1A;
+  --kurtto-charcoal: #3D3D3A;
+  --kurtto-stone: #73726C;
+  --kurtto-ash: #B4B2A9;
+  --kurtto-sand: #F1EFE8;
+  --kurtto-blush: #FAECE7;
+  --kurtto-white: #FFFFFF;
+  font-family: Inter, -apple-system, system-ui, sans-serif;
+  color: var(--kurtto-ink);
+}
+
+/* Barra superior: marca kurtto no lugar do branding padrão do Swagger UI */
+.swagger-ui .topbar {
+  background-color: var(--kurtto-ember);
+  border-bottom: 1px solid var(--kurtto-flame);
+  padding: 8px 0;
+}
+
+.swagger-ui .topbar .download-url-wrapper {
+  display: none;
+}
+
+.swagger-ui .topbar-wrapper img[alt="Swagger UI"],
+.swagger-ui .topbar-wrapper .link,
+.swagger-ui .topbar-wrapper .link::after,
+.swagger-ui .topbar-wrapper .link span,
+.swagger-ui .topbar-wrapper .topbar-title {
+  display: none !important;
+}
+
+.swagger-ui .topbar-wrapper::before {
+  content: '';
+  display: inline-block;
+  vertical-align: middle;
+  background: url('../images/kurtto-logo-compact.svg') no-repeat left center;
+  background-size: contain;
+  width: 132px;
+  height: 32px;
+  margin-right: 16px;
+}
+
+.swagger-ui .info .version-stamp {
+  background-color: var(--kurtto-ember);
+  color: var(--kurtto-white);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 500;
+}
+
+.swagger-ui .info,
+.swagger-ui .scheme-container {
+  margin: 24px 0;
+}
+
+.swagger-ui .info .title {
+  font-size: 1.75rem;
+  font-weight: 500;
+  color: var(--kurtto-ink);
+  letter-spacing: -0.02em;
+}
+
+.swagger-ui .info .base-url,
+.swagger-ui .info h1,
+.swagger-ui .info h2,
+.swagger-ui .info h3,
+.swagger-ui .info h4,
+.swagger-ui .info h5 {
+  font-family: Inter, -apple-system, system-ui, sans-serif;
+  font-weight: 500;
+}
+
+.swagger-ui .info .description,
+.swagger-ui .info p,
+.swagger-ui .info li {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--kurtto-charcoal);
+}
+
+.swagger-ui .info a,
+.swagger-ui a {
+  color: var(--kurtto-ember);
+}
+
+.swagger-ui .info a:hover,
+.swagger-ui a:hover {
+  color: var(--kurtto-flame);
+}
+
+.swagger-ui .opblock-tag {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--kurtto-ink);
+  border-bottom: 1px solid var(--kurtto-ash);
+  padding-bottom: 8px;
+}
+
+.swagger-ui .opblock .opblock-summary-description,
+.swagger-ui .parameter__name,
+.swagger-ui .response-col_description {
+  color: var(--kurtto-stone);
+}
+
+.swagger-ui .btn,
+.swagger-ui .try-out__btn {
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.swagger-ui .try-out__btn {
+  border: 1.5px solid var(--kurtto-ember);
+  color: var(--kurtto-ember);
+  background: transparent;
+}
+
+.swagger-ui .try-out__btn:hover {
+  background: var(--kurtto-blush);
+}
+
+.swagger-ui .btn.execute {
+  background: var(--kurtto-ember);
+  border: 1.5px solid var(--kurtto-ember);
+  color: var(--kurtto-white);
+}
+
+.swagger-ui .btn.execute:hover {
+  background: var(--kurtto-flame);
+  border-color: var(--kurtto-flame);
+}
+
+.swagger-ui .btn.cancel {
+  border-color: var(--kurtto-ash);
+  color: var(--kurtto-charcoal);
+}
+
+.swagger-ui .btn.authorize {
+  border-color: var(--kurtto-ember);
+  color: var(--kurtto-ember);
+}
+
+.swagger-ui .btn.authorize:hover {
+  background: var(--kurtto-blush);
+}
+
+.swagger-ui input[type=text],
+.swagger-ui input[type=password],
+.swagger-ui textarea,
+.swagger-ui select {
+  border-radius: 8px;
+  border: 1.5px solid var(--kurtto-ash);
+  font-size: 14px;
+}
+
+.swagger-ui input[type=text]:focus,
+.swagger-ui input[type=password]:focus,
+.swagger-ui textarea:focus,
+.swagger-ui select:focus {
+  border-color: var(--kurtto-ember);
+  box-shadow: 0 0 0 3px rgba(232, 89, 60, 0.12);
+  outline: none;
+}
+
+.swagger-ui .model-box,
+.swagger-ui .microlight,
+.swagger-ui code,
+.swagger-ui .parameter__type,
+.swagger-ui .prop-type {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+.swagger-ui .wrapper {
+  padding: 0 24px 48px;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.swagger-ui .filter-container .filter input {
+  border: 1.5px solid var(--kurtto-ash);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .swagger-ui {
+    --kurtto-page-bg: #1A1A1A;
+    --kurtto-surface: #2C2C2A;
+  }
+
+  .swagger-ui body,
+  .swagger-ui {
+    background: var(--kurtto-page-bg);
+  }
+
+  .swagger-ui .info .title,
+  .swagger-ui .opblock-tag {
+    color: #F1EFE8;
+  }
+
+  .swagger-ui .info .description,
+  .swagger-ui .info p,
+  .swagger-ui .info li {
+    color: #B4B2A9;
+  }
+
+  .swagger-ui .scheme-container,
+  .swagger-ui .opblock {
+    background: var(--kurtto-surface);
+  }
+}

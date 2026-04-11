@@ -6,11 +6,11 @@ const healthRouter = Router();
 
 /**
  * @swagger
- * /api/v1/health:
+ * /health:
  *   get:
  *     summary: Verifica a saude da API
- *     description: Endpoint para verificar se a API esta funcionando corretamente
- *     tags: [Monitoramento]
+ *     description: Indica se a API responde e se o banco esta acessivel.
+ *     tags: [Health]
  *     responses:
  *       200:
  *         description: API em funcionamento normal
@@ -18,6 +18,13 @@ const healthRouter = Router();
  *           application/json:
  *             schema:
  *               type: object
+ *               required:
+ *                 - status
+ *                 - message
+ *                 - timestamp
+ *                 - uptime
+ *                 - environment
+ *                 - database
  *               properties:
  *                 status:
  *                   type: string
@@ -25,10 +32,18 @@ const healthRouter = Router();
  *                 message:
  *                   type: string
  *                   example: API is running
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 uptime:
+ *                   type: number
+ *                   description: Segundos desde o start do processo
+ *                 environment:
+ *                   type: string
+ *                   enum: [development, test, production]
  *                 database:
  *                   type: string
  *                   enum: [connected, disconnected]
- *                   example: connected
  *       503:
  *         description: API degradada (banco indisponivel)
  *         content:
@@ -39,6 +54,15 @@ const healthRouter = Router();
  *                 status:
  *                   type: string
  *                   example: degraded
+ *                 message:
+ *                   type: string
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 uptime:
+ *                   type: number
+ *                 environment:
+ *                   type: string
  *                 database:
  *                   type: string
  *                   example: disconnected
