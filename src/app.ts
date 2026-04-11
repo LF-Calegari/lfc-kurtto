@@ -1,3 +1,4 @@
+import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
@@ -13,6 +14,17 @@ import { setupSwagger } from './config/swagger.js';
 const app = express();
 
 app.use(helmet());
+app.use(
+  compression({
+    threshold: 1024,
+    filter: (req, res) => {
+      if (req.method === 'GET' && !req.path.startsWith('/api')) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  }),
+);
 app.use(cors(buildCorsOptions()));
 app.use(globalRateLimiter);
 app.use(requestLogger);

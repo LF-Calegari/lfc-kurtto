@@ -15,6 +15,41 @@ import { useIntegrationDatabase } from '../helpers/setup';
 useIntegrationDatabase();
 
 describe('health and errors', () => {
+  it('GET /api/v1/health/live returns 200 (no DB)', async () => {
+    const response = await request(app).get('/api/v1/health/live');
+
+    expect(response.status).toBe(HttpStatusCode.OK);
+    expect(response.body.status).toBe('alive');
+    expect(Number.isNaN(Date.parse(response.body.timestamp))).toBe(false);
+  });
+
+  it('GET /api/v1/health/ready returns 200 when dependencies ok', async () => {
+    const response = await request(app).get('/api/v1/health/ready');
+
+    expect(response.status).toBe(HttpStatusCode.OK);
+    expect(response.body.status).toBe('ready');
+    expect(response.body.database).toBe('connected');
+    const expectCache =
+      process.env.REDIS_URL?.trim() ? 'connected' : 'disconnected';
+    expect(response.body.cache).toBe(expectCache);
+  });
+
+  it('GET /api/v1/health/ready returns 503 when SELECT 1 fails', async () => {
+    const spy = jest
+      .spyOn(AppDataSource, 'query')
+      .mockRejectedValue(new Error('simulated query failure'));
+
+    try {
+      const response = await request(app).get('/api/v1/health/ready');
+
+      expect(response.status).toBe(HttpStatusCode.SERVICE_UNAVAILABLE);
+      expect(response.body.status).toBe('not_ready');
+      expect(response.body.database).toBe('disconnected');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('GET /api/v1/health returns 200 with expected contract', async () => {
     const response = await request(app).get('/api/v1/health');
 

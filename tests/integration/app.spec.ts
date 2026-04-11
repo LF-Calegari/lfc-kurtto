@@ -19,6 +19,16 @@ describe('app routes', () => {
     expect(typeof response.body.uptime).toBe('number');
   });
 
+  it('GET /api/docs.json may use gzip for large OpenAPI payload', async () => {
+    const response = await request(app)
+      .get('/api/docs.json')
+      .set('Accept-Encoding', 'gzip, deflate');
+
+    expect(response.status).toBe(HttpStatusCode.OK);
+    expect(Number(response.text?.length ?? 0)).toBeGreaterThan(1024);
+    expect(String(response.headers['content-encoding'] ?? '')).toMatch(/gzip/i);
+  });
+
   it('GET /api/docs redireciona para /api/docs/ (Swagger UI)', async () => {
     const response = await request(app).get('/api/docs');
 

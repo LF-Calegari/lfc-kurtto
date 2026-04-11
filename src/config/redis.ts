@@ -4,7 +4,6 @@ import { env } from './env.js';
 import { logger } from './logger.js';
 
 let client: Redis | null = null;
-let shutdownHooksRegistered = false;
 
 function redisUrl(): string | undefined {
   const u = env.REDIS_URL?.trim();
@@ -77,16 +76,4 @@ export async function quitRedis(): Promise<void> {
       /* ignore */
     }
   }
-}
-
-export function registerRedisShutdownHooks(): void {
-  if (shutdownHooksRegistered) {
-    return;
-  }
-  shutdownHooksRegistered = true;
-  const onShutdown = (): void => {
-    void quitRedis();
-  };
-  process.on('SIGTERM', onShutdown);
-  process.on('SIGINT', onShutdown);
 }

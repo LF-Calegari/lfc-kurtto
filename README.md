@@ -50,6 +50,8 @@ Fluxo:
 
 | Metodo | Caminho | Descricao |
 | ------ | ------- | --------- |
+| `GET` | `/api/v1/health/live` | Liveness: processo vivo (`200`, sem checagem de banco/cache). |
+| `GET` | `/api/v1/health/ready` | Readiness: PostgreSQL acessivel; com `REDIS_URL` definido, Redis tambem deve responder (`200` ready ou `503` not_ready). |
 | `GET` | `/:code` | Redirecionamento publico para `original_url` (`302` + cache desabilitado; `404` / `410` conforme regras acima). |
 | `POST` | `/api/v1/urls` | Cria link encurtado (`201` com `short_url` a partir de `BASE_URL`; `409` se `custom_code` duplicado; `422` em validacao). |
 | `GET` | `/api/v1/urls` | Lista paginada (`page` padrao 1, `limit` padrao 10, max 100; `active` opcional `true`/`false`; meta `page`, `limit`, `total`, `total_pages`; ordenacao `created_at` DESC). |
@@ -117,7 +119,7 @@ No Docker Compose, o script `docker/postgres/create-test-db.sh` cria `kurtto_tes
 - **Opcional:** com `REDIS_URL` (ex.: `redis://localhost:6379`), o `GET /:code` usa Redis (chave `url:{code}`, JSON com `original_url`, `is_active`, `expires_at`, TTL `REDIS_CACHE_TTL` segundos, padrão **3600**). *Miss* carrega do PostgreSQL e repovoa o cache; *hit* válido evita consulta ao banco.
 - **Invalidação:** `PATCH` e `DELETE` em `/api/v1/urls/:code`; detecção de `expires_at` vencido no redirect remove a chave e reconsulta o PG.
 - **Sem Redis:** omita `REDIS_URL` — a API segue só com PostgreSQL.
-- **Health:** `GET /api/v1/health` inclui `cache`: `connected` | `disconnected`. Redis indisponível **não** força `503` se o banco estiver ok.
+- **Health:** `GET /api/v1/health` inclui `cache`: `connected` | `disconnected`. Redis indisponível **não** força `503` se o banco estiver ok. Probes Kubernetes/ECS: **`GET /api/v1/health/live`** (liveness) e **`GET /api/v1/health/ready`** (readiness; com Redis configurado, ambos devem estar ok).
 - **Docker Compose:** o serviço `redis` (imagem `redis:8.6-alpine` com *healthcheck*) sobe com a API; `api` aguarda `redis` e `db` saudáveis.
 
 ## Docker
@@ -149,12 +151,24 @@ Aplicar migrations via profile dedicado:
 docker compose --profile migrate run --rm migrate
 ```
 
+## Producao
+
+- **Imagem:** o stage `production` do `Dockerfile` usa `NODE_ENV=production`, dependencias sem dev, `USER node`, `STOPSIGNAL SIGTERM`, `HEALTHCHECK` em `GET http://127.0.0.1:3000/api/v1/health/live` (requer `wget` na imagem base Alpine; ja presente no `node:24-alpine`).
+- **Compose:** `docker-compose.prod.yml` sobrescreve o servico `api` para `build.target: production`, `restart: unless-stopped`, remove o volume de codigo fonte e expoe apenas a porta da aplicacao (sem `9229` de debug). Exemplo:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build api
+```
+
+- Defina `CORS_ORIGINS` e demais variaveis sensiveis no ambiente; nao commite segredos.
+
 ## Logging
 
 - **Winston** (`src/config/logger.ts`): em `production`, saida JSON no nivel **info** (ou `LOG_LEVEL`); timestamp em ISO; meta como `context` (ex.: `http`, `url`, `error`, `bootstrap`, `redirect`, `process`). Em `development` e `test`, formato colorido simples no nivel **debug** por padrao.
-- **Request log** (`src/middlewares/requestLogger.ts`): ao final da resposta, registra metodo, path, status e duracao em ms; **sem body**; nivel **info** se status &lt; 400, **warn** para 4xx, **error** para 5xx. Por padrao **nao** registra `GET /api/v1/health`; ajuste com `REQUEST_LOG_SKIP_PATHS` (CSV de paths; vazio desativa o filtro).
+- **Request log** (`src/middlewares/requestLogger.ts`): ao final da resposta, registra metodo, path, status e duracao em ms; **sem body**; nivel **info** se status &lt; 400, **warn** para 4xx, **error** para 5xx. Por padrao **nao** registra `GET` em `/api/v1/health`, `/api/v1/health/live` nem `/api/v1/health/ready`; ajuste com `REQUEST_LOG_SKIP_PATHS` (CSV de paths; vazio desativa o filtro).
 - **Erros**: hierarquia em `src/errors/` (`AppError`, `NotFoundError`, `ConflictError`, `ValidationError`); `errorHandler` central trata `instanceof`, loga com Winston e inclui `stack` na resposta JSON apenas em ambiente nao produto para erros 500 nao operacionais.
-- **Processo**: `uncaughtException` e `unhandledRejection` em `src/server.ts` registram com Winston e encerram o processo com codigo 1.
+- **Processo**: `uncaughtException` e `unhandledRejection` em `src/server.ts` registram com Winston e encerram o processo com codigo 1. **Encerramento ordenado** (`SIGTERM` / `SIGINT`): `src/config/graceful-shutdown.ts` registra o sinal, chama `server.close()`, aguarda ate `GRACEFUL_SHUTDOWN_TIMEOUT_MS` (padrao **30000**), encerra TypeORM (`destroy`) e Redis (`quit`); **exit 1** apenas em timeout de shutdown ou erro ao fechar o HTTP server; caso contrario **exit 0**.
+- **Compressao** (`compression`): respostas JSON acima de **1 KB** podem usar gzip/deflate quando o cliente envia `Accept-Encoding` adequado; rotas fora de `/api` (ex.: `GET /:code` de redirect) **nao** passam pelo filtro de compressao.
 
 ## Seguranca
 

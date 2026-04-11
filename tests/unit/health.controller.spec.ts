@@ -16,6 +16,130 @@ jest.unstable_mockModule('@config/redis', () => ({
 const { default: healthController } =
   await import('@controllers/HealthController');
 
+describe('HealthController.live', () => {
+  it('returns 200 alive without touching database', async () => {
+    const statusCalls: number[] = [];
+    const jsonCalls: unknown[] = [];
+    const res = {
+      status(code: number) {
+        statusCalls.push(code);
+        return this;
+      },
+      json(payload: unknown) {
+        jsonCalls.push(payload);
+        return this;
+      },
+    } as unknown as Response;
+
+    const next = jest.fn() as NextFunction;
+
+    await healthController.live({} as Request, res, next);
+
+    expect(statusCalls).toEqual([HttpStatusCode.OK]);
+    expect(next).not.toHaveBeenCalled();
+    const payload = jsonCalls[0] as Record<string, unknown>;
+    expect(payload.status).toBe('alive');
+    expect(Number.isNaN(Date.parse(String(payload.timestamp)))).toBe(false);
+  });
+});
+
+describe('HealthController.ready', () => {
+  beforeEach(() => {
+    isRedisConfigured.mockReturnValue(false);
+    pingRedis.mockResolvedValue(false);
+  });
+
+  it('returns 200 ready when DB ok without Redis', async () => {
+    const wasInitialized = AppDataSource.isInitialized;
+    const query = jest
+      .spyOn(AppDataSource, 'query')
+      .mockResolvedValue([{ ok: 1 }]);
+    Object.defineProperty(AppDataSource, 'isInitialized', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+    isRedisConfigured.mockReturnValue(false);
+
+    const statusCalls: number[] = [];
+    const jsonCalls: unknown[] = [];
+    const res = {
+      status(code: number) {
+        statusCalls.push(code);
+        return this;
+      },
+      json(payload: unknown) {
+        jsonCalls.push(payload);
+        return this;
+      },
+    } as unknown as Response;
+
+    const next = jest.fn() as NextFunction;
+
+    try {
+      await healthController.ready({} as Request, res, next);
+    } finally {
+      query.mockRestore();
+      Object.defineProperty(AppDataSource, 'isInitialized', {
+        value: wasInitialized,
+        configurable: true,
+        writable: true,
+      });
+    }
+
+    expect(statusCalls).toEqual([HttpStatusCode.OK]);
+    const payload = jsonCalls[0] as Record<string, unknown>;
+    expect(payload.status).toBe('ready');
+    expect(payload.database).toBe('connected');
+  });
+
+  it('returns 503 not_ready when Redis configured but ping fails', async () => {
+    const wasInitialized = AppDataSource.isInitialized;
+    const query = jest
+      .spyOn(AppDataSource, 'query')
+      .mockResolvedValue([{ ok: 1 }]);
+    Object.defineProperty(AppDataSource, 'isInitialized', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+    isRedisConfigured.mockReturnValue(true);
+    pingRedis.mockResolvedValue(false);
+
+    const statusCalls: number[] = [];
+    const jsonCalls: unknown[] = [];
+    const res = {
+      status(code: number) {
+        statusCalls.push(code);
+        return this;
+      },
+      json(payload: unknown) {
+        jsonCalls.push(payload);
+        return this;
+      },
+    } as unknown as Response;
+
+    const next = jest.fn() as NextFunction;
+
+    try {
+      await healthController.ready({} as Request, res, next);
+    } finally {
+      query.mockRestore();
+      Object.defineProperty(AppDataSource, 'isInitialized', {
+        value: wasInitialized,
+        configurable: true,
+        writable: true,
+      });
+    }
+
+    expect(statusCalls).toEqual([HttpStatusCode.SERVICE_UNAVAILABLE]);
+    const payload = jsonCalls[0] as Record<string, unknown>;
+    expect(payload.status).toBe('not_ready');
+    expect(payload.database).toBe('connected');
+    expect(payload.cache).toBe('disconnected');
+  });
+});
+
 describe('HealthController.check', () => {
   beforeEach(() => {
     isRedisConfigured.mockReturnValue(false);

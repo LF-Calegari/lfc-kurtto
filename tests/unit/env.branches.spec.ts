@@ -69,7 +69,9 @@ describe('env.ts ramos (subprocess)', () => {
       noEnvDir,
     );
     expect(r0.status).toBe(0);
-    expect(r0.out).toContain('["/api/v1/health"]');
+    expect(r0.out).toContain(
+      '["/api/v1/health","/api/v1/health/live","/api/v1/health/ready"]',
+    );
 
     const empty = [
       'process.env.NODE_ENV = \'development\';',
