@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
 import { z } from 'zod';
 
-config();
+config({ quiet: true });
 
 const FIFTEEN_MIN_MS = 15 * 60 * 1000;
 const ONE_MIN_MS = 60 * 1000;

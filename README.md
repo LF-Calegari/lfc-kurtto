@@ -118,7 +118,7 @@ No Docker Compose, o script `docker/postgres/create-test-db.sh` cria `kurtto_tes
 - **Invalidação:** `PATCH` e `DELETE` em `/api/v1/urls/:code`; detecção de `expires_at` vencido no redirect remove a chave e reconsulta o PG.
 - **Sem Redis:** omita `REDIS_URL` — a API segue só com PostgreSQL.
 - **Health:** `GET /api/v1/health` inclui `cache`: `connected` | `disconnected`. Redis indisponível **não** força `503` se o banco estiver ok.
-- **Docker Compose:** o serviço `redis` (imagem `redis:7-alpine` com *healthcheck*) sobe com a API; `api` aguarda `redis` e `db` saudáveis.
+- **Docker Compose:** o serviço `redis` (imagem `redis:8.6-alpine` com *healthcheck*) sobe com a API; `api` aguarda `redis` e `db` saudáveis.
 
 ## Docker
 
