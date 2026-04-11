@@ -85,12 +85,17 @@ const envSchema = z
   })
   .transform((data) => {
     const raw = data.REQUEST_LOG_SKIP_PATHS;
-    const requestLogSkipPaths =
-      raw === undefined
-        ? ['/api/v1/health']
-        : raw.trim() === ''
-          ? []
-          : raw.split(',').map((s) => s.trim()).filter(Boolean);
+    let requestLogSkipPaths: string[];
+    if (raw === undefined) {
+      requestLogSkipPaths = ['/api/v1/health'];
+    } else if (raw.trim() === '') {
+      requestLogSkipPaths = [];
+    } else {
+      requestLogSkipPaths = raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
     const swaggerEnabled =
       data.NODE_ENV === 'production'
         ? data.SWAGGER_ENABLED === 'true'
