@@ -12,6 +12,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --forceExit",
     "test:watch": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --watch --forceExit",
     "test:coverage": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --forceExit --coverage",
