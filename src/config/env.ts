@@ -68,6 +68,11 @@ const envSchema = z
      * Vazio = nao ignorar nenhuma rota. Ausente = padrao /api/v1/health.
      */
     REQUEST_LOG_SKIP_PATHS: z.string().optional(),
+    /**
+     * Em `production`, Swagger so sobe se `true`. Em development/test, padrao ligado;
+     * use `false` para desligar.
+     */
+    SWAGGER_ENABLED: z.enum(['true', 'false']).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production' && !data.CORS_ORIGINS?.trim()) {
@@ -86,7 +91,12 @@ const envSchema = z
         : raw.trim() === ''
           ? []
           : raw.split(',').map((s) => s.trim()).filter(Boolean);
-    return { ...data, requestLogSkipPaths };
+    const swaggerEnabled =
+      data.NODE_ENV === 'production'
+        ? data.SWAGGER_ENABLED === 'true'
+        : data.SWAGGER_ENABLED !== 'false';
+
+    return { ...data, requestLogSkipPaths, swaggerEnabled };
   });
 
 const parsedEnv = envSchema.safeParse(process.env);

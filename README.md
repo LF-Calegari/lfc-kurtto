@@ -55,6 +55,12 @@ Fluxo:
 | `PATCH` | `/api/v1/urls/:code` | Atualizacao parcial (sem `short_code`/`clicks`; `404` se inexistente). |
 | `DELETE` | `/api/v1/urls/:code` | Remocao fisica (`204` ou `404`). |
 
+## Documentacao interativa (Swagger)
+
+- **UI:** `GET /api/docs` (redireciona para `/api/docs/`) — Swagger UI com *Try it out*.
+- **Spec JSON:** `GET /api/docs.json` — OpenAPI 3.0 gerada com `swagger-jsdoc` a partir dos comentarios nas rotas em `src/routes/*.ts` e da definicao base em `src/config/swagger.ts` (info **Kurtto API 1.0.0**, servidores `/api/v1` e `/`, *tags* Health, Urls, Redirect, *schemas* compartilhados).
+- **Producao:** com `NODE_ENV=production`, a documentacao so e exposta se `SWAGGER_ENABLED=true`. Caso contrario (incluindo ausencia da variavel), as rotas `/api/docs` e `/api/docs.json` nao sao registradas. Em development/test o padrao e habilitado; use `SWAGGER_ENABLED=false` para desligar.
+
 ## Scripts
 
 - `npm run dev`: inicia ambiente de desenvolvimento com watch e debug.

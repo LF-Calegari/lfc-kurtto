@@ -19,17 +19,15 @@ describe('app routes', () => {
     expect(typeof response.body.uptime).toBe('number');
   });
 
-  it('GET /api/v1/documentation returns swagger ui redirect', async () => {
-    const response = await request(app).get('/api/v1/documentation');
+  it('GET /api/docs redireciona para /api/docs/ (Swagger UI)', async () => {
+    const response = await request(app).get('/api/docs');
 
     expect(response.status).toBe(HttpStatusCode.MOVED_PERMANENTLY);
-    expect(String(response.headers.location ?? '')).toMatch(
-      /\/api\/v1\/documentation\/$/,
-    );
+    expect(String(response.headers.location ?? '')).toMatch(/\/api\/docs\/?$/);
   });
 
-  it('GET /api/v1/documentation/ returns HTML response', async () => {
-    const response = await request(app).get('/api/v1/documentation/');
+  it('GET /api/docs/ retorna HTML do Swagger UI', async () => {
+    const response = await request(app).get('/api/docs/');
 
     expect(response.status).toBe(HttpStatusCode.OK);
     expect(String(response.headers['content-type'] ?? '')).toMatch(

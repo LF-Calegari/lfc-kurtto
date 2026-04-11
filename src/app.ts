@@ -8,7 +8,7 @@ import errorHandler from '@middlewares/errorHandler';
 import { globalRateLimiter } from '@middlewares/rateLimit';
 import { requestLogger } from '@middlewares/requestLogger';
 import routes from '@routes/index';
-import swagger from './swagger/index.js';
+import { setupSwagger } from './config/swagger.js';
 
 const app = express();
 
@@ -17,7 +17,7 @@ app.use(cors(buildCorsOptions()));
 app.use(globalRateLimiter);
 app.use(requestLogger);
 
-swagger(app);
+setupSwagger(app);
 routes(app);
 
 app.use((_req, _res, next) => {
