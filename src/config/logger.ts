@@ -13,10 +13,13 @@ const devFormat = winston.format.combine(
   winston.format.colorize({ level: true }),
   winston.format.printf((info) => {
     const { timestamp, level, message, context } = info;
-    const ctx =
-      context !== undefined && context !== null && context !== ''
-        ? ` [${String(context)}]`
-        : '';
+    let ctx = '';
+    if (context !== undefined && context !== null && context !== '') {
+      ctx =
+        typeof context === 'object'
+          ? ` [${JSON.stringify(context)}]`
+          : ` [${String(context)}]`;
+    }
     return `${String(timestamp)} ${level}:${ctx} ${String(message)}`;
   }),
 );

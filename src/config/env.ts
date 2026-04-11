@@ -50,10 +50,7 @@ const envSchema = z
     DB_USER: z.string().min(1).default('postgres'),
     DB_PASSWORD: z.string().min(1).default('postgres'),
     DB_NAME: z.string().min(1).default('kurtto'),
-    BASE_URL: z
-      .string()
-      .url()
-      .default('http://localhost:3000'),
+    BASE_URL: z.url().default('http://localhost:3000'),
     SHORT_CODE_LENGTH: z.coerce.number().int().min(3).max(10).default(7),
     /** Origens CORS em producao (CSV). Em development/test, se vazio, usa `*`. */
     CORS_ORIGINS: z.string().optional(),

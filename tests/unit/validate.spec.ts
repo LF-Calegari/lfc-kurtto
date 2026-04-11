@@ -25,7 +25,7 @@ describe('zodErrorResponse', () => {
 
 describe('validateBody', () => {
   it('calls next with ValidationError when body is invalid', () => {
-    const schema = z.object({ originalUrl: z.string().url() });
+    const schema = z.object({ originalUrl: z.url() });
     const middleware = validateBody(schema);
     const req = {
       body: { originalUrl: 'not-a-url' },
@@ -41,7 +41,7 @@ describe('validateBody', () => {
   });
 
   it('parses valid body and replaces req.body', () => {
-    const schema = z.object({ originalUrl: z.string().url() });
+    const schema = z.object({ originalUrl: z.url() });
     const middleware = validateBody(schema);
     const req = {
       body: { originalUrl: 'https://example.com' },
