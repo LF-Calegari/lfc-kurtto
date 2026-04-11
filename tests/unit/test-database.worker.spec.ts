@@ -28,6 +28,12 @@ describe('deriveIntegrationTestDatabaseUrlForWorker', () => {
       deriveIntegrationTestDatabaseUrlForWorker('  ', '1'),
     ).toThrow('URL base de teste vazia');
   });
+
+  it('rejeita nome derivado inválido para o banco', () => {
+    expect(() =>
+      deriveIntegrationTestDatabaseUrlForWorker(base, 'worker-1'),
+    ).toThrow('Nome de banco derivado inválido');
+  });
 });
 
 describe(
@@ -45,6 +51,20 @@ describe(
       expect(() => extractDatabaseNameFromPostgresUrl('not-a-url')).toThrow(
         'URL de Postgres inválida',
       );
+    });
+
+    it('rejeita protocolo diferente de postgres', () => {
+      expect(() =>
+        extractDatabaseNameFromPostgresUrl(
+          'mysql://user:pass@localhost:3306/db',
+        ),
+      ).toThrow(/esperado postgres/i);
+    });
+
+    it('rejeita URL sem nome de banco no path', () => {
+      expect(() =>
+        extractDatabaseNameFromPostgresUrl('postgresql://localhost:5432'),
+      ).toThrow(/sem nome de banco/i);
     });
 
     it('substitui o banco na URL', () => {
