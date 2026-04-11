@@ -1,4 +1,5 @@
 import type { Express } from 'express';
+import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import swaggerJSDoc from 'swagger-jsdoc';
@@ -8,6 +9,13 @@ import { env } from '@config/env';
 import { logger } from '@config/logger';
 
 const currentDirPath = path.dirname(fileURLToPath(import.meta.url));
+
+/** Base pública dos assets estáticos do Swagger (espelha o padrão swagger-static do authenticator). */
+const SWAGGER_STATIC_BASE = '/api/swagger-static';
+
+/** Em dev: `src/swagger`; em produção (dist): `dist/swagger` (copiado no `npm run build`). */
+const getSwaggerAssetsRoot = (): string =>
+  path.resolve(currentDirPath, '../swagger');
 
 const getRouteApiGlobs = (): string[] => {
   const isProduction = process.env.NODE_ENV === 'production';
@@ -21,11 +29,24 @@ const getRouteApiGlobs = (): string[] => {
 const openApiDefinition = {
   openapi: '3.0.0',
   info: {
-    title: 'Kurtto API',
+    title: 'kurtto API',
     version: '1.0.0',
     description:
-      'API de encurtamento de URLs. Explore e teste os endpoints ' +
-      '(Try it out) com a especificacao alinhada ao codigo.',
+      'API HTTP para **criar, consultar e atualizar** links encurtados e ' +
+      'para documentar o **redirecionamento publico** na raiz do host.\n\n' +
+      '### Como usar esta documentacao\n' +
+      '- Escolha o servidor **API versionada (v1)** para operacoes da API.\n' +
+      '- O servidor **Raiz** descreve o fluxo `GET /{codigo}` de ' +
+      'redirecionamento.\n' +
+      '- Em cada operacao, use **Try it out** para enviar requisicoes de ' +
+      'teste.\n\n' +
+      'Contratos e codigos de resposta seguem a implementacao atual do ' +
+      'servico.',
+    'x-logo': {
+      url: `${SWAGGER_STATIC_BASE}/images/kurtto-logo-compact.svg`,
+      altText: 'kurtto',
+      backgroundColor: '#FFFFFF',
+    },
   },
   servers: [
     {
@@ -38,11 +59,22 @@ const openApiDefinition = {
     },
   ],
   tags: [
-    { name: 'Health', description: 'Saude e disponibilidade do servico' },
-    { name: 'Urls', description: 'CRUD de links encurtados' },
+    {
+      name: 'Health',
+      description:
+        'Verificacao de disponibilidade da API e conectividade com o banco.',
+    },
+    {
+      name: 'Urls',
+      description:
+        'Criacao, listagem, detalhe, atualizacao e remocao de URLs ' +
+        'encurtadas.',
+    },
     {
       name: 'Redirect',
-      description: 'Redirecionamento publico por codigo curto',
+      description:
+        'Acesso publico ao link curto: redirecionamento 302 para a URL ' +
+        'original.',
     },
   ],
   components: {
@@ -160,6 +192,17 @@ export function buildSwaggerSpec(): Record<string, unknown> {
   }) as Record<string, unknown>;
 }
 
+function registerSwaggerAssets(app: Express): void {
+  app.use(
+    SWAGGER_STATIC_BASE,
+    express.static(getSwaggerAssetsRoot(), {
+      maxAge: '1d',
+      index: false,
+      dotfiles: 'deny',
+    }),
+  );
+}
+
 export function setupSwagger(app: Express): void {
   if (!env.swaggerEnabled) {
     logger.info('Swagger UI desabilitado pela configuracao', {
@@ -169,6 +212,8 @@ export function setupSwagger(app: Express): void {
     });
     return;
   }
+
+  registerSwaggerAssets(app);
 
   const spec = buildSwaggerSpec();
 
@@ -180,7 +225,15 @@ export function setupSwagger(app: Express): void {
     '/api/docs',
     swaggerUi.serve,
     swaggerUi.setup(spec, {
-      customSiteTitle: 'Kurtto API — Swagger UI',
+      customSiteTitle: 'kurtto API · documentação',
+      customCssUrl: `${SWAGGER_STATIC_BASE}/css/swagger-custom.css`,
+      customfavIcon: `${SWAGGER_STATIC_BASE}/images/kurtto-favicon.svg`,
+      swaggerOptions: {
+        docExpansion: 'list',
+        filter: true,
+        persistAuthorization: true,
+        displayRequestDuration: true,
+      },
     }),
   );
 }

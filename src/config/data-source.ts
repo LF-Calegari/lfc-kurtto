@@ -5,21 +5,37 @@ import { fileURLToPath } from 'node:url';
 import { DataSource } from 'typeorm';
 
 import { Url } from '../entities/Url.js';
+import { CreateUrlTable1744190400000 } from
+  '../migrations/1744190400000-CreateUrlsTable.js';
+import { AddDeletedAtToUrls1744300800000 } from
+  '../migrations/1744300800000-AddDeletedAtToUrls.js';
 import { env } from './env.js';
+import { getIntegrationTestDatabaseUrl } from './test-database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const migrationsGlob = path.join(__dirname, '../migrations/*{.ts,.js}');
 
-/** Jest + ESM loads migration TS via eval; skip metadata load inside the runner. */
+/**
+ * No Jest, usar classes explícitas (ordem cronológica) em vez do glob, que
+ * conflita com VM modules / ESM no runner.
+ */
+const jestMigrationClasses = [
+  CreateUrlTable1744190400000,
+  AddDeletedAtToUrls1744300800000,
+];
+
 const migrationPaths =
-  process.env.JEST_WORKER_ID !== undefined ? [] : [migrationsGlob];
+  process.env.JEST_WORKER_ID !== undefined
+    ? jestMigrationClasses
+    : [migrationsGlob];
 
 export type CreateAppDataSourceOptions = {
   /**
-   * When defined, overrides how `DATABASE_URL` from env is applied.
-   * Use empty string to force host/port/credentials mode (same as unset URL).
+   * When defined, overrides how the effective database URL is resolved (inclui
+   * `KURTTO_TEST_DATABASE_URL` em `NODE_ENV=test`). Use string vazia para forçar
+   * modo host/port/credentials (igual a URL ausente).
    */
   databaseUrlOverride?: string;
 };
@@ -27,10 +43,11 @@ export type CreateAppDataSourceOptions = {
 export function createAppDataSource(
   buildOptions?: CreateAppDataSourceOptions,
 ): DataSource {
+  const testDedicatedUrl = getIntegrationTestDatabaseUrl();
   const databaseUrl =
     buildOptions?.databaseUrlOverride !== undefined
       ? buildOptions.databaseUrlOverride.trim() || undefined
-      : env.DATABASE_URL?.trim();
+      : testDedicatedUrl ?? env.DATABASE_URL?.trim();
 
   const common = {
     type: 'postgres' as const,

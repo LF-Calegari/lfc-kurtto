@@ -14,9 +14,13 @@ describe('Swagger OpenAPI', () => {
     const body = response.body as Record<string, unknown>;
     expect(body.openapi).toBe('3.0.0');
     expect(body.info).toMatchObject({
-      title: 'Kurtto API',
+      title: 'kurtto API',
       version: '1.0.0',
     });
+    const info = body.info as { 'x-logo'?: { url?: string } };
+    expect(info['x-logo']?.url).toBe(
+      '/api/swagger-static/images/kurtto-logo-compact.svg',
+    );
 
     const paths = body.paths as Record<string, unknown>;
     expect(paths['/health']).toBeDefined();

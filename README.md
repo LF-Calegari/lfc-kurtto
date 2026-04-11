@@ -87,17 +87,27 @@ Fluxo:
 ### Testes (Jest + Supertest)
 
 - Configuracao: `jest.config.ts`, `jest.setup.ts` (`reflect-metadata`), `tsconfig.jest.json`.
-- Pastas: `tests/unit` (*.spec.ts), `tests/integration` (*.spec.ts), helpers em `tests/helpers` (`env-test.ts` aplica `DATABASE_URL_TEST` sobre `DATABASE_URL` quando definido; `setup.ts` com `useIntegrationDatabase()` para integracao: `initialize` + `TRUNCATE urls` entre casos).
-- No processo Jest, o TypeORM **nao** carrega arquivos de migration via glob (evita conflito com VM modules); aplique migrations **antes** dos testes (`npm run migration:run`). O servico Docker de teste executa `migration:run && npm test` automaticamente.
+- Pastas: `tests/unit` (*.spec.ts), `tests/integration` (*.spec.ts), helpers em `tests/helpers`. **Banco de teste (padrão alinhado ao auth-service):** em `NODE_ENV=test`, o DataSource usa `KURTTO_TEST_DATABASE_URL` (ou `DATABASE_URL_TEST` legado) com precedência sobre `DATABASE_URL`. O helper `useIntegrationDatabase()` exige uma dessas URLs (ou `KURTTO_INTEGRATION_USE_ENV_DATABASE=true`) para evitar rodar integração contra o Postgres de desenvolvimento por engano. `env-test.ts` deriva, por worker Jest, uma URL com banco `nome_base_w` + `JEST_WORKER_ID` (ex.: `kurtto_test_w2`; sem worker id, mantém o nome base) e replica em `DATABASE_URL`. `setup.ts`: `CREATE DATABASE` idempotente se necessário, `initialize`, `runMigrations()` na primeira conexão do worker e `TRUNCATE urls` entre casos. Se `KURTTO_TEST_DATABASE_DROP_AFTER_RUN=true`, o helper fecha conexões e executa `DROP DATABASE IF EXISTS` do banco derivado ao final de cada arquivo de teste.
+- No Jest, migrations são registradas como classes (evita glob + VM modules no runner); cada worker aplica as pendentes no próprio banco derivado. O servico Docker com profile `test` executa só `npm test` (sem `migration:run` prévio obrigatório).
+- Execução serial (um processo): `npx jest --runInBand` (ou `JEST_WORKER_ID` ausente fora do Jest continua usando o banco base da URL).
 - Exemplo local (Postgres na porta 5432):
 
 ```bash
+# Banco de desenvolvimento (migrations)
 export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/kurtto
 npm run migration:run
+
+# URL *base* de teste: crie `kurtto_test` uma vez (ex.: CREATE DATABASE kurtto_test;).
+# Cada worker Jest cria/usará `kurtto_test_w1`, `kurtto_test_w2`, etc., e aplica migrations automaticamente.
+export KURTTO_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/kurtto_test
+# Opcional: limpar bancos derivados automaticamente após cada arquivo de teste.
+# export KURTTO_TEST_DATABASE_DROP_AFTER_RUN=true
 npm test
 ```
 
-No CI (SonarCloud), o workflow sobe Postgres 18 (`postgres:18-alpine`), roda `migration:run` e em seguida lint, typecheck e `npm run test:coverage`.
+No CI (SonarCloud), o workflow sobe Postgres 18 (`postgres:18-alpine`), cria o banco `kurtto_test` se necessário, define `KURTTO_TEST_DATABASE_URL`, e em seguida lint, typecheck e `npm run test:coverage` (migrations por worker durante os testes de integração).
+
+No Docker Compose, o script `docker/postgres/create-test-db.sh` cria `kurtto_test` na primeira inicialização do volume; o serviço com profile `test` já exporta `KURTTO_TEST_DATABASE_URL` apontando para esse banco.
 
 ## Docker
 

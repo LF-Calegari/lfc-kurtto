@@ -18,6 +18,24 @@ const envSchema = z
       .default('development'),
     PORT: z.coerce.number().int().positive().default(3000),
     DATABASE_URL: z.string().min(1).optional(),
+    /**
+     * URL Postgres só para Jest (`NODE_ENV=test`); tem precedência sobre
+     * `DATABASE_URL` no DataSource. Alinhado ao papel de variável dedicada de
+     * teste no auth-service (`AUTH_SERVICE_TEST_SQL_BASE`).
+     */
+    KURTTO_TEST_DATABASE_URL: z.string().min(1).optional(),
+    /** Legado: mesmo efeito de `KURTTO_TEST_DATABASE_URL`. */
+    DATABASE_URL_TEST: z.string().min(1).optional(),
+    /**
+     * Se `true`, integração Jest pode usar `DATABASE_URL` / `DB_*` sem
+     * `KURTTO_TEST_DATABASE_URL` (uso avançado; risco de apontar para dev).
+     */
+    KURTTO_INTEGRATION_USE_ENV_DATABASE: z.string().optional(),
+    /**
+     * Se `true`, remove o banco derivado do worker ao fim da execução do arquivo
+     * de teste (útil para limpeza automática em pipelines locais/CI).
+     */
+    KURTTO_TEST_DATABASE_DROP_AFTER_RUN: z.enum(['true', 'false']).optional(),
     DB_HOST: z.string().min(1).default('db'),
     DB_PORT: z.coerce.number().int().positive().default(5432),
     DB_USER: z.string().min(1).default('postgres'),

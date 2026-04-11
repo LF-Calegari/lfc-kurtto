@@ -35,4 +35,41 @@ describe('app routes', () => {
     );
     expect(response.text).toMatch(/swagger/i);
   });
+
+  it(
+    'GET /api/swagger-static/images/kurtto-favicon.svg retorna SVG da marca',
+    async () => {
+      const response = await request(app).get(
+        '/api/swagger-static/images/kurtto-favicon.svg',
+      );
+
+      expect(response.status).toBe(HttpStatusCode.OK);
+      expect(String(response.headers['content-type'] ?? '')).toMatch(
+        /image\/svg\+xml/i,
+      );
+      const svgPayload =
+        typeof response.text === 'string' && response.text.length > 0
+          ? response.text
+          : Buffer.isBuffer(response.body)
+            ? response.body.toString('utf8')
+            : String(response.body ?? '');
+      expect(svgPayload).toContain('viewBox="0 0 32 32"');
+    },
+  );
+
+  it(
+    'GET /api/swagger-static/css/swagger-custom.css retorna CSS do tema',
+    async () => {
+      const response = await request(app).get(
+        '/api/swagger-static/css/swagger-custom.css',
+      );
+
+      expect(response.status).toBe(HttpStatusCode.OK);
+      expect(String(response.headers['content-type'] ?? '')).toMatch(
+        /text\/css/i,
+      );
+      expect(response.text).toContain('.swagger-ui');
+      expect(response.text).toContain('--kurtto-ember');
+    },
+  );
 });
