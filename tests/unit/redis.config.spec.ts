@@ -109,19 +109,6 @@ describe('@config/redis', () => {
     await expect(redis.quitRedis()).resolves.toBeUndefined();
   });
 
-  it('registerRedisShutdownHooks registers SIGTERM/SIGINT once', async () => {
-    process.env.REDIS_URL = 'redis://127.0.0.1:6379';
-    const onSpy = jest.spyOn(process, 'on').mockReturnValue(process);
-    const redis = await import('@config/redis');
-    redis.registerRedisShutdownHooks();
-    redis.registerRedisShutdownHooks();
-    const sig = onSpy.mock.calls.filter(
-      (c) => c[0] === 'SIGTERM' || c[0] === 'SIGINT',
-    );
-    expect(sig).toHaveLength(2);
-    onSpy.mockRestore();
-  });
-
   it('quitRedis succeeds when quit resolves', async () => {
     process.env.REDIS_URL = 'redis://127.0.0.1:6379';
     mockQuit.mockResolvedValue('OK');

@@ -6,6 +6,76 @@ const healthRouter = Router();
 
 /**
  * @swagger
+ * /health/live:
+ *   get:
+ *     summary: Liveness (processo vivo)
+ *     description: Sem dependencias externas; adequado a probes de liveness.
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Processo ativo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [status, timestamp]
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: alive
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ */
+healthRouter.get('/live', (req, res, next) => {
+  void healthController.live(req, res, next).catch(next);
+});
+
+/**
+ * @swagger
+ * /health/ready:
+ *   get:
+ *     summary: Readiness (dependencias)
+ *     description: Exige PostgreSQL acessivel; se REDIS_URL estiver definido, exige Redis acessivel.
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Pronto para receber trafego
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [status, timestamp, database, cache]
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: ready
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 database:
+ *                   type: string
+ *                   enum: [connected, disconnected]
+ *                 cache:
+ *                   type: string
+ *                   enum: [connected, disconnected]
+ *       503:
+ *         description: Nao pronto
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: not_ready
+ */
+healthRouter.get('/ready', (req, res, next) => {
+  void healthController.ready(req, res, next).catch(next);
+});
+
+/**
+ * @swagger
  * /health:
  *   get:
  *     summary: Verifica a saude da API

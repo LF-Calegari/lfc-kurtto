@@ -5,7 +5,6 @@ import type { Server } from 'node:http';
 import { AppDataSource } from '@config/data-source';
 import { env } from '@config/env';
 import { logger } from '@config/logger';
-import { registerRedisShutdownHooks } from '@config/redis';
 
 import app from './app.js';
 
@@ -19,7 +18,6 @@ function exitAfterDbFailure(error: unknown): never {
 }
 
 export async function startApplication(): Promise<Server> {
-  registerRedisShutdownHooks();
   try {
     await AppDataSource.initialize();
     logger.info('Database connection established successfully.', {

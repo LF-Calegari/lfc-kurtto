@@ -17,6 +17,15 @@ const envSchema = z
       .enum(['development', 'test', 'production'])
       .default('development'),
     PORT: z.coerce.number().int().positive().default(3000),
+    /**
+     * Limite (ms) para encerramento ordenado apos SIGTERM/SIGINT: fecha o HTTP
+     * server, destroy no TypeORM e quit no Redis. Padrao 30s.
+     */
+    GRACEFUL_SHUTDOWN_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(30_000),
     DATABASE_URL: z.string().min(1).optional(),
     /**
      * URL Postgres só para Jest (`NODE_ENV=test`); tem precedência sobre
@@ -83,7 +92,7 @@ const envSchema = z
       .optional(),
     /**
      * CSV de paths (path sem query) para nao registrar request log em GET.
-     * Vazio = nao ignorar nenhuma rota. Ausente = padrao /api/v1/health.
+     * Vazio = nao ignorar nenhuma rota. Ausente = padrao health + live/ready.
      */
     REQUEST_LOG_SKIP_PATHS: z.string().optional(),
     /**
@@ -118,7 +127,11 @@ const envSchema = z
     const raw = data.REQUEST_LOG_SKIP_PATHS;
     let requestLogSkipPaths: string[];
     if (raw === undefined) {
-      requestLogSkipPaths = ['/api/v1/health'];
+      requestLogSkipPaths = [
+        '/api/v1/health',
+        '/api/v1/health/live',
+        '/api/v1/health/ready',
+      ];
     } else if (raw.trim() === '') {
       requestLogSkipPaths = [];
     } else {
