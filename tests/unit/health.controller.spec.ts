@@ -49,6 +49,7 @@ describe('HealthController.check', () => {
     const payload = jsonCalls[0] as Record<string, unknown>;
     expect(payload.status).toBe('degraded');
     expect(payload.database).toBe('disconnected');
+    expect(['connected', 'disconnected']).toContain(payload.cache);
     expect(payload.message).toBe(
       'API is running but database is unavailable',
     );
