@@ -96,7 +96,10 @@ const envSchema = z
       if (val === undefined || val === null || val === '') {
         return undefined;
       }
-      const s = String(val).trim();
+      if (typeof val !== 'string') {
+        return undefined;
+      }
+      const s = val.trim();
       return s === '' ? undefined : s;
     }, z.string().min(1).optional()),
     /** TTL em segundos para entradas `url:{code}` no Redis (padrão 3600). */
