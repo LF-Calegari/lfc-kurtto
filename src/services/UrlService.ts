@@ -62,7 +62,7 @@ export function serializeUrl(url: Url): Record<string, unknown> {
 export class UrlService {
   public async create(dto: CreateUrlDto): Promise<Url> {
     const expiresAt =
-      dto.expiresAt !== undefined ? new Date(dto.expiresAt) : null;
+      dto.expiresAt === undefined ? null : new Date(dto.expiresAt);
 
     if (dto.customCode) {
       const taken = await findUrlByShortCode(dto.customCode);
