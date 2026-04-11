@@ -2,6 +2,7 @@ import { QueryFailedError } from 'typeorm';
 
 import { env } from '@config/env';
 import { logger } from '@config/logger';
+import cacheService from '@services/CacheService';
 import { AppError } from '@errors/AppError';
 import { ConflictError } from '@errors/ConflictError';
 import type {
@@ -150,6 +151,29 @@ export class UrlService {
   }
 
   public async resolveRedirect(shortCode: string): Promise<RedirectResolution> {
+    const cached = await cacheService.get(shortCode);
+    if (cached) {
+      const now = Date.now();
+      const exp =
+        cached.expires_at !== null && cached.expires_at !== ''
+          ? new Date(cached.expires_at).getTime()
+          : null;
+      if (exp !== null && !Number.isNaN(exp) && exp <= now) {
+        await cacheService.delete(shortCode);
+        return this.resolveRedirectFromDatabase(shortCode);
+      }
+      if (!cached.is_active) {
+        return { outcome: 'gone_inactive' };
+      }
+      return { outcome: 'redirect', originalUrl: cached.original_url };
+    }
+
+    return this.resolveRedirectFromDatabase(shortCode);
+  }
+
+  private async resolveRedirectFromDatabase(
+    shortCode: string,
+  ): Promise<RedirectResolution> {
     const url = await findUrlByShortCode(shortCode);
     if (!url) {
       return { outcome: 'not_found' };
@@ -157,11 +181,17 @@ export class UrlService {
     const now = Date.now();
     if (url.expiresAt !== null && url.expiresAt.getTime() <= now) {
       await updateUrlByShortCode(shortCode, { isActive: false });
+      await cacheService.delete(shortCode);
       return { outcome: 'gone_expired' };
     }
     if (!url.isActive) {
       return { outcome: 'gone_inactive' };
     }
+    await cacheService.set(shortCode, {
+      original_url: url.originalUrl,
+      is_active: url.isActive,
+      expires_at: url.expiresAt?.toISOString() ?? null,
+    });
     return { outcome: 'redirect', originalUrl: url.originalUrl };
   }
 
@@ -197,6 +227,7 @@ export class UrlService {
     }
     const updated = await updateUrlByShortCode(shortCode, patch);
     if (updated) {
+      await cacheService.delete(shortCode);
       logger.info('patched', { context: 'url', shortCode, id: updated.id });
     }
     return updated;
@@ -205,6 +236,7 @@ export class UrlService {
   public async remove(shortCode: string): Promise<boolean> {
     const removed = await hardDeleteUrlByShortCode(shortCode);
     if (removed) {
+      await cacheService.delete(shortCode);
       logger.info('hard deleted', { context: 'url', shortCode });
     }
     return removed;

@@ -1,8 +1,13 @@
 import { jest } from '@jest/globals';
 
 import { AppDataSource } from '@config/data-source';
+import { env } from '@config/env';
 
 import { startApplication } from '../../src/bootstrap.js';
+
+import { useIntegrationDatabase } from '../helpers/setup';
+
+useIntegrationDatabase();
 
 describe('bootstrap', () => {
   it('startApplication opens HTTP server and can be closed', async () => {
@@ -16,11 +21,16 @@ describe('bootstrap', () => {
       await AppDataSource.destroy();
     }
 
+    const savedPort = env.PORT;
+    env.PORT = 0;
+
     try {
       const server = await startApplication();
 
       try {
         expect(server.listening).toBe(true);
+        const addr = server.address();
+        expect(addr && typeof addr === 'object' && addr.port > 0).toBe(true);
       } finally {
         await new Promise<void>((resolve, reject) => {
           server.close((err) => (err ? reject(err) : resolve()));
@@ -33,6 +43,7 @@ describe('bootstrap', () => {
         }
       }
     } finally {
+      env.PORT = savedPort;
       exitSpy.mockRestore();
     }
   });

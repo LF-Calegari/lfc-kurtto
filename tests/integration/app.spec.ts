@@ -19,17 +19,25 @@ describe('app routes', () => {
     expect(typeof response.body.uptime).toBe('number');
   });
 
-  it('GET /api/v1/documentation returns swagger ui redirect', async () => {
-    const response = await request(app).get('/api/v1/documentation');
+  it('GET /api/docs.json may use gzip for large OpenAPI payload', async () => {
+    const response = await request(app)
+      .get('/api/docs.json')
+      .set('Accept-Encoding', 'gzip, deflate');
 
-    expect(response.status).toBe(HttpStatusCode.MOVED_PERMANENTLY);
-    expect(String(response.headers.location ?? '')).toMatch(
-      /\/api\/v1\/documentation\/$/,
-    );
+    expect(response.status).toBe(HttpStatusCode.OK);
+    expect(Number(response.text?.length ?? 0)).toBeGreaterThan(1024);
+    expect(String(response.headers['content-encoding'] ?? '')).toMatch(/gzip/i);
   });
 
-  it('GET /api/v1/documentation/ returns HTML response', async () => {
-    const response = await request(app).get('/api/v1/documentation/');
+  it('GET /api/docs redireciona para /api/docs/ (Swagger UI)', async () => {
+    const response = await request(app).get('/api/docs');
+
+    expect(response.status).toBe(HttpStatusCode.MOVED_PERMANENTLY);
+    expect(String(response.headers.location ?? '')).toMatch(/\/api\/docs\/?$/);
+  });
+
+  it('GET /api/docs/ retorna HTML do Swagger UI', async () => {
+    const response = await request(app).get('/api/docs/');
 
     expect(response.status).toBe(HttpStatusCode.OK);
     expect(String(response.headers['content-type'] ?? '')).toMatch(
@@ -37,4 +45,41 @@ describe('app routes', () => {
     );
     expect(response.text).toMatch(/swagger/i);
   });
+
+  it(
+    'GET /api/swagger-static/images/kurtto-favicon.svg retorna SVG da marca',
+    async () => {
+      const response = await request(app).get(
+        '/api/swagger-static/images/kurtto-favicon.svg',
+      );
+
+      expect(response.status).toBe(HttpStatusCode.OK);
+      expect(String(response.headers['content-type'] ?? '')).toMatch(
+        /image\/svg\+xml/i,
+      );
+      const svgPayload =
+        typeof response.text === 'string' && response.text.length > 0
+          ? response.text
+          : Buffer.isBuffer(response.body)
+            ? response.body.toString('utf8')
+            : String(response.body ?? '');
+      expect(svgPayload).toContain('viewBox="0 0 32 32"');
+    },
+  );
+
+  it(
+    'GET /api/swagger-static/css/swagger-custom.css retorna CSS do tema',
+    async () => {
+      const response = await request(app).get(
+        '/api/swagger-static/css/swagger-custom.css',
+      );
+
+      expect(response.status).toBe(HttpStatusCode.OK);
+      expect(String(response.headers['content-type'] ?? '')).toMatch(
+        /text\/css/i,
+      );
+      expect(response.text).toContain('.swagger-ui');
+      expect(response.text).toContain('--kurtto-ember');
+    },
+  );
 });

@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 
 import { AppDataSource } from '@config/data-source';
 import { env } from '@config/env';
+import { isRedisConfigured, pingRedis } from '@config/redis';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
 
 class HealthController {
@@ -19,6 +20,56 @@ class HealthController {
     }
   }
 
+  private async resolveCacheStatus(): Promise<'connected' | 'disconnected'> {
+    if (!isRedisConfigured()) {
+      return 'disconnected';
+    }
+    return (await pingRedis()) ? 'connected' : 'disconnected';
+  }
+
+  public async live(
+    _req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      res.status(HttpStatusCode.OK).json({
+        status: 'alive',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public async ready(
+    _req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const database = await this.resolveDatabaseStatus();
+      const cacheConfigured = isRedisConfigured();
+      const cache = await this.resolveCacheStatus();
+      const dbOk = database === 'connected';
+      const cacheOk = !cacheConfigured || cache === 'connected';
+      const ready = dbOk && cacheOk;
+
+      res
+        .status(
+          ready ? HttpStatusCode.OK : HttpStatusCode.SERVICE_UNAVAILABLE,
+        )
+        .json({
+          status: ready ? 'ready' : 'not_ready',
+          timestamp: new Date().toISOString(),
+          database,
+          cache,
+        });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public async check(
     _req: Request,
     res: Response,
@@ -26,6 +77,7 @@ class HealthController {
   ): Promise<void> {
     try {
       const database = await this.resolveDatabaseStatus();
+      const cache = await this.resolveCacheStatus();
       const degraded = database === 'disconnected';
 
       res
@@ -41,6 +93,7 @@ class HealthController {
           uptime: process.uptime(),
           environment: env.NODE_ENV,
           database,
+          cache,
         });
     } catch (error) {
       next(error);

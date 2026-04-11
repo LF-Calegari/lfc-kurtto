@@ -1,3 +1,4 @@
+import { setupGracefulShutdown } from './config/graceful-shutdown.js';
 import { logger } from './config/logger.js';
 import { startApplication } from './bootstrap.js';
 
@@ -29,11 +30,15 @@ process.on('unhandledRejection', (reason: unknown) => {
   process.exit(1);
 });
 
-void startApplication().catch((error: unknown) => {
-  logger.error('Failed to start application', {
-    context: 'bootstrap',
-    message: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : undefined,
+void startApplication()
+  .then((server) => {
+    setupGracefulShutdown(server);
+  })
+  .catch((error: unknown) => {
+    logger.error('Failed to start application', {
+      context: 'bootstrap',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    process.exit(1);
   });
-  process.exit(1);
-});

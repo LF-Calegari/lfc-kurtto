@@ -1,0 +1,22 @@
+# Override para build de producao e politica de restart.
+# Uso tipico:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build api
+#
+# Remove o bind-mount de codigo fonte (`volumes: !reset null`) e usa o stage
+# `production` do Dockerfile (USER node, HEALTHCHECK em /api/v1/health/live).
+#
+# Limites de CPU/memoria (exemplo; descomente e ajuste conforme carga / orquestrador):
+# deploy:
+#   resources:
+#     limits:
+#       cpus: '1.0'
+#       memory: 512M
+
+services:
+  api:
+    build:
+      target: production
+    restart: unless-stopped
+    volumes: !reset null
+    ports: !override
+      - "${PORT:-3000}:3000"

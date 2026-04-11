@@ -15,12 +15,50 @@ import { useIntegrationDatabase } from '../helpers/setup';
 useIntegrationDatabase();
 
 describe('health and errors', () => {
+  it('GET /api/v1/health/live returns 200 (no DB)', async () => {
+    const response = await request(app).get('/api/v1/health/live');
+
+    expect(response.status).toBe(HttpStatusCode.OK);
+    expect(response.body.status).toBe('alive');
+    expect(Number.isNaN(Date.parse(response.body.timestamp))).toBe(false);
+  });
+
+  it('GET /api/v1/health/ready returns 200 when dependencies ok', async () => {
+    const response = await request(app).get('/api/v1/health/ready');
+
+    expect(response.status).toBe(HttpStatusCode.OK);
+    expect(response.body.status).toBe('ready');
+    expect(response.body.database).toBe('connected');
+    const expectCache =
+      process.env.REDIS_URL?.trim() ? 'connected' : 'disconnected';
+    expect(response.body.cache).toBe(expectCache);
+  });
+
+  it('GET /api/v1/health/ready returns 503 when SELECT 1 fails', async () => {
+    const spy = jest
+      .spyOn(AppDataSource, 'query')
+      .mockRejectedValue(new Error('simulated query failure'));
+
+    try {
+      const response = await request(app).get('/api/v1/health/ready');
+
+      expect(response.status).toBe(HttpStatusCode.SERVICE_UNAVAILABLE);
+      expect(response.body.status).toBe('not_ready');
+      expect(response.body.database).toBe('disconnected');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('GET /api/v1/health returns 200 with expected contract', async () => {
     const response = await request(app).get('/api/v1/health');
 
     expect(response.status).toBe(HttpStatusCode.OK);
     expect(response.body.status).toBe('ok');
     expect(response.body.database).toBe('connected');
+    expect(response.body.cache).toBe(
+      process.env.REDIS_URL?.trim() ? 'connected' : 'disconnected',
+    );
     expect(response.body.message).toBe('API is running');
     expect(response.body.environment).toBe('test');
     expect(typeof response.body.uptime).toBe('number');
@@ -38,6 +76,7 @@ describe('health and errors', () => {
 
       expect(response.status).toBe(HttpStatusCode.SERVICE_UNAVAILABLE);
       expect(response.body.database).toBe('disconnected');
+      expect(['connected', 'disconnected']).toContain(response.body.cache);
       expect(response.body.status).toBe('degraded');
     } finally {
       spy.mockRestore();
@@ -53,6 +92,7 @@ describe('health and errors', () => {
       expect(response.status).toBe(HttpStatusCode.SERVICE_UNAVAILABLE);
       expect(response.body.status).toBe('degraded');
       expect(response.body.database).toBe('disconnected');
+      expect(['connected', 'disconnected']).toContain(response.body.cache);
     } finally {
       if (!AppDataSource.isInitialized) {
         await AppDataSource.initialize();

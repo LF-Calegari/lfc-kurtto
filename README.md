@@ -1,5 +1,7 @@
 # Kurtto Service
 
+[![CI](https://github.com/LF-Calegari/lfc-kurtto/actions/workflows/ci.yml/badge.svg?branch=development)](https://github.com/LF-Calegari/lfc-kurtto/actions/workflows/ci.yml)
+
 API base do projeto Kurtto para evolucao de funcionalidades de encurtamento de links.
 
 ## Objetivo do projeto (semantico)
@@ -48,6 +50,8 @@ Fluxo:
 
 | Metodo | Caminho | Descricao |
 | ------ | ------- | --------- |
+| `GET` | `/api/v1/health/live` | Liveness: processo vivo (`200`, sem checagem de banco/cache). |
+| `GET` | `/api/v1/health/ready` | Readiness: PostgreSQL acessivel; com `REDIS_URL` definido, Redis tambem deve responder (`200` ready ou `503` not_ready). |
 | `GET` | `/:code` | Redirecionamento publico para `original_url` (`302` + cache desabilitado; `404` / `410` conforme regras acima). |
 | `POST` | `/api/v1/urls` | Cria link encurtado (`201` com `short_url` a partir de `BASE_URL`; `409` se `custom_code` duplicado; `422` em validacao). |
 | `GET` | `/api/v1/urls` | Lista paginada (`page` padrao 1, `limit` padrao 10, max 100; `active` opcional `true`/`false`; meta `page`, `limit`, `total`, `total_pages`; ordenacao `created_at` DESC). |
@@ -55,13 +59,20 @@ Fluxo:
 | `PATCH` | `/api/v1/urls/:code` | Atualizacao parcial (sem `short_code`/`clicks`; `404` se inexistente). |
 | `DELETE` | `/api/v1/urls/:code` | Remocao fisica (`204` ou `404`). |
 
+## Documentacao interativa (Swagger)
+
+- **UI:** `GET /api/docs` (redireciona para `/api/docs/`) — Swagger UI com *Try it out*.
+- **Spec JSON:** `GET /api/docs.json` — OpenAPI 3.0 gerada com `swagger-jsdoc` a partir dos comentarios nas rotas em `src/routes/*.ts` e da definicao base em `src/config/swagger.ts` (info **Kurtto API 1.0.0**, servidores `/api/v1` e `/`, *tags* Health, Urls, Redirect, *schemas* compartilhados).
+- **Producao:** com `NODE_ENV=production`, a documentacao so e exposta se `SWAGGER_ENABLED=true`. Caso contrario (incluindo ausencia da variavel), as rotas `/api/docs` e `/api/docs.json` nao sao registradas. Em development/test o padrao e habilitado; use `SWAGGER_ENABLED=false` para desligar.
+
 ## Scripts
 
 - `npm run dev`: inicia ambiente de desenvolvimento com watch e debug.
 - `npm run build`: compila TypeScript para `dist`.
 - `npm run start`: executa build em modo producao.
 - `npm run typecheck`: valida tipos sem gerar build.
-- `npm run lint`: executa lint do projeto.
+- `npm run lint`: executa lint do projeto (ESLint 9, config plana em `eslint.config.mjs`).
+- `npm run lint:fix`: aplica correcoes automaticas do ESLint quando possivel.
 - `npm run test`: executa a suite **Jest** (ESM + `ts-jest`; requer PostgreSQL com migrations aplicadas; veja **Testes** abaixo).
 - `npm run test:watch` / `npm run test:unit` / `npm run test:integration`: variantes Jest com `--runInBand --forceExit`.
 - `npm run test:coverage`: Jest com `--coverage`, relatorio `coverage/lcov.info` e thresholds globais (branches 70%; demais 80%).
@@ -81,21 +92,39 @@ Fluxo:
 ### Testes (Jest + Supertest)
 
 - Configuracao: `jest.config.ts`, `jest.setup.ts` (`reflect-metadata`), `tsconfig.jest.json`.
-- Pastas: `tests/unit` (*.spec.ts), `tests/integration` (*.spec.ts), helpers em `tests/helpers` (`env-test.ts` aplica `DATABASE_URL_TEST` sobre `DATABASE_URL` quando definido; `setup.ts` com `useIntegrationDatabase()` para integracao: `initialize` + `TRUNCATE urls` entre casos).
-- No processo Jest, o TypeORM **nao** carrega arquivos de migration via glob (evita conflito com VM modules); aplique migrations **antes** dos testes (`npm run migration:run`). O servico Docker de teste executa `migration:run && npm test` automaticamente.
+- Pastas: `tests/unit` (*.spec.ts), `tests/integration` (*.spec.ts), helpers em `tests/helpers`. **Banco de teste (padrão alinhado ao auth-service):** em `NODE_ENV=test`, o DataSource usa `KURTTO_TEST_DATABASE_URL` (ou `DATABASE_URL_TEST` legado) com precedência sobre `DATABASE_URL`. O helper `useIntegrationDatabase()` exige uma dessas URLs (ou `KURTTO_INTEGRATION_USE_ENV_DATABASE=true`) para evitar rodar integração contra o Postgres de desenvolvimento por engano. `env-test.ts` deriva, por worker Jest, uma URL com banco `nome_base_w` + `JEST_WORKER_ID` (ex.: `kurtto_test_w2`; sem worker id, mantém o nome base) e replica em `DATABASE_URL`. `setup.ts`: `CREATE DATABASE` idempotente se necessário, `initialize`, `runMigrations()` na primeira conexão do worker e `TRUNCATE urls` entre casos. Se `KURTTO_TEST_DATABASE_DROP_AFTER_RUN=true`, o helper fecha conexões e executa `DROP DATABASE IF EXISTS` do banco derivado ao final de cada arquivo de teste.
+- No Jest, migrations são registradas como classes (evita glob + VM modules no runner); cada worker aplica as pendentes no próprio banco derivado. O servico Docker com profile `test` executa só `npm test` (sem `migration:run` prévio obrigatório).
+- Execução serial (um processo): `npx jest --runInBand` (ou `JEST_WORKER_ID` ausente fora do Jest continua usando o banco base da URL).
 - Exemplo local (Postgres na porta 5432):
 
 ```bash
+# Banco de desenvolvimento (migrations)
 export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/kurtto
 npm run migration:run
+
+# URL *base* de teste: crie `kurtto_test` uma vez (ex.: CREATE DATABASE kurtto_test;).
+# Cada worker Jest cria/usará `kurtto_test_w1`, `kurtto_test_w2`, etc., e aplica migrations automaticamente.
+export KURTTO_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/kurtto_test
+# Opcional: limpar bancos derivados automaticamente após cada arquivo de teste.
+# export KURTTO_TEST_DATABASE_DROP_AFTER_RUN=true
 npm test
 ```
 
-No CI (SonarCloud), o workflow sobe Postgres 18 (`postgres:18-alpine`), roda `migration:run` e em seguida lint, typecheck e `npm run test:coverage`.
+No GitHub Actions, o workflow **CI** (`.github/workflows/ci.yml`) executa em `push` em `main` e `development` e em `pull_request` para `main`: job `lint-and-typecheck` (Node 24, `npm ci`, `typecheck`, `lint`) e job `test` com Postgres 18, `pg_isready`, `migration:run` no banco `kurtto`, `DATABASE_URL_TEST` / `KURTTO_TEST_DATABASE_URL`, `npm run test:coverage` e *artifact* `coverage/`. O workflow SonarCloud (`.github/workflows/sonarcloud.yml`) também gera `coverage/lcov.info` para análise e sobe Postgres 18 com as mesmas variáveis de teste; migrations adicionais continuam sendo aplicadas por worker durante os testes de integração.
+
+No Docker Compose, o script `docker/postgres/create-test-db.sh` cria `kurtto_test` na primeira inicialização do volume; o serviço com profile `test` já exporta `KURTTO_TEST_DATABASE_URL` apontando para esse banco.
+
+## Cache de redirect (Redis)
+
+- **Opcional:** com `REDIS_URL` (ex.: `redis://localhost:6379`), o `GET /:code` usa Redis (chave `url:{code}`, JSON com `original_url`, `is_active`, `expires_at`, TTL `REDIS_CACHE_TTL` segundos, padrão **3600**). *Miss* carrega do PostgreSQL e repovoa o cache; *hit* válido evita consulta ao banco.
+- **Invalidação:** `PATCH` e `DELETE` em `/api/v1/urls/:code`; detecção de `expires_at` vencido no redirect remove a chave e reconsulta o PG.
+- **Sem Redis:** omita `REDIS_URL` — a API segue só com PostgreSQL.
+- **Health:** `GET /api/v1/health` inclui `cache`: `connected` | `disconnected`. Redis indisponível **não** força `503` se o banco estiver ok. Probes Kubernetes/ECS: **`GET /api/v1/health/live`** (liveness) e **`GET /api/v1/health/ready`** (readiness; com Redis configurado, ambos devem estar ok).
+- **Docker Compose:** o serviço `redis` (imagem `redis:8.6-alpine` com *healthcheck*) sobe com a API; `api` aguarda `redis` e `db` saudáveis.
 
 ## Docker
 
-Subir API + PostgreSQL:
+Subir API + PostgreSQL + Redis:
 
 ```bash
 docker compose up --build
@@ -122,12 +151,24 @@ Aplicar migrations via profile dedicado:
 docker compose --profile migrate run --rm migrate
 ```
 
+## Producao
+
+- **Imagem:** o stage `production` do `Dockerfile` usa `NODE_ENV=production`, dependencias sem dev, `USER node`, `STOPSIGNAL SIGTERM`, `HEALTHCHECK` em `GET http://127.0.0.1:3000/api/v1/health/live` (requer `wget` na imagem base Alpine; ja presente no `node:24-alpine`).
+- **Compose:** `docker-compose.prod.yml` sobrescreve o servico `api` para `build.target: production`, `restart: unless-stopped`, remove o volume de codigo fonte e expoe apenas a porta da aplicacao (sem `9229` de debug). Exemplo:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build api
+```
+
+- Defina `CORS_ORIGINS` e demais variaveis sensiveis no ambiente; nao commite segredos.
+
 ## Logging
 
 - **Winston** (`src/config/logger.ts`): em `production`, saida JSON no nivel **info** (ou `LOG_LEVEL`); timestamp em ISO; meta como `context` (ex.: `http`, `url`, `error`, `bootstrap`, `redirect`, `process`). Em `development` e `test`, formato colorido simples no nivel **debug** por padrao.
-- **Request log** (`src/middlewares/requestLogger.ts`): ao final da resposta, registra metodo, path, status e duracao em ms; **sem body**; nivel **info** se status &lt; 400, **warn** para 4xx, **error** para 5xx. Por padrao **nao** registra `GET /api/v1/health`; ajuste com `REQUEST_LOG_SKIP_PATHS` (CSV de paths; vazio desativa o filtro).
+- **Request log** (`src/middlewares/requestLogger.ts`): ao final da resposta, registra metodo, path, status e duracao em ms; **sem body**; nivel **info** se status &lt; 400, **warn** para 4xx, **error** para 5xx. Por padrao **nao** registra `GET` em `/api/v1/health`, `/api/v1/health/live` nem `/api/v1/health/ready`; ajuste com `REQUEST_LOG_SKIP_PATHS` (CSV de paths; vazio desativa o filtro).
 - **Erros**: hierarquia em `src/errors/` (`AppError`, `NotFoundError`, `ConflictError`, `ValidationError`); `errorHandler` central trata `instanceof`, loga com Winston e inclui `stack` na resposta JSON apenas em ambiente nao produto para erros 500 nao operacionais.
-- **Processo**: `uncaughtException` e `unhandledRejection` em `src/server.ts` registram com Winston e encerram o processo com codigo 1.
+- **Processo**: `uncaughtException` e `unhandledRejection` em `src/server.ts` registram com Winston e encerram o processo com codigo 1. **Encerramento ordenado** (`SIGTERM` / `SIGINT`): `src/config/graceful-shutdown.ts` registra o sinal, chama `server.close()`, aguarda ate `GRACEFUL_SHUTDOWN_TIMEOUT_MS` (padrao **30000**), encerra TypeORM (`destroy`) e Redis (`quit`); **exit 1** apenas em timeout de shutdown ou erro ao fechar o HTTP server; caso contrario **exit 0**.
+- **Compressao** (`compression`): respostas JSON acima de **1 KB** podem usar gzip/deflate quando o cliente envia `Accept-Encoding` adequado; rotas fora de `/api` (ex.: `GET /:code` de redirect) **nao** passam pelo filtro de compressao.
 
 ## Seguranca
 
@@ -149,7 +190,24 @@ curl -sI -X OPTIONS "http://localhost:3000/api/v1/urls" \
   -H "Access-Control-Request-Method: POST"
 ```
 
-## CI SonarCloud
+## CI/CD
+
+### GitHub Actions (CI)
+
+- **Workflow:** `.github/workflows/ci.yml` (badge no topo deste README).
+- **Gatilhos:** `push` em `main` e `development`; `pull_request` para `main`.
+- **Jobs:** validacao de tipos e ESLint; testes com Postgres 18, migrations e cobertura com *upload* do diretorio `coverage/` como *artifact*.
+
+### Branch protection (recomendado)
+
+No GitHub: **Settings** > **Branches** > *Add branch protection rule* (ou regra existente) para `main` e, se aplicavel, `development`:
+
+- Exigir *pull request* antes do merge (sem *push* direto em `main`).
+- Exigir que os *status checks* obrigatorios passem (inclua os jobs do workflow **CI** e, se usar, o SonarCloud / *Quality Gate*).
+- Exigir revisao de codigo quando a politica do time assim definir.
+- Considerar **Require linear history** ou **Require branches to be up to date** conforme fluxo de release.
+
+### SonarCloud
 
 O workflow `.github/workflows/sonarcloud.yml` executa em `push` e `pull_request` nas branches `main` e `development`.
 
