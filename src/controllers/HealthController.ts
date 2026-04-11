@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 
 import { AppDataSource } from '@config/data-source';
 import { env } from '@config/env';
+import { isRedisConfigured, pingRedis } from '@config/redis';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
 
 class HealthController {
@@ -19,6 +20,13 @@ class HealthController {
     }
   }
 
+  private async resolveCacheStatus(): Promise<'connected' | 'disconnected'> {
+    if (!isRedisConfigured()) {
+      return 'disconnected';
+    }
+    return (await pingRedis()) ? 'connected' : 'disconnected';
+  }
+
   public async check(
     _req: Request,
     res: Response,
@@ -26,6 +34,7 @@ class HealthController {
   ): Promise<void> {
     try {
       const database = await this.resolveDatabaseStatus();
+      const cache = await this.resolveCacheStatus();
       const degraded = database === 'disconnected';
 
       res
@@ -41,6 +50,7 @@ class HealthController {
           uptime: process.uptime(),
           environment: env.NODE_ENV,
           database,
+          cache,
         });
     } catch (error) {
       next(error);

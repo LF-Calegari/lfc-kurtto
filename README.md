@@ -112,9 +112,17 @@ No GitHub Actions, o workflow **CI** (`.github/workflows/ci.yml`) executa em `pu
 
 No Docker Compose, o script `docker/postgres/create-test-db.sh` cria `kurtto_test` na primeira inicialização do volume; o serviço com profile `test` já exporta `KURTTO_TEST_DATABASE_URL` apontando para esse banco.
 
+## Cache de redirect (Redis)
+
+- **Opcional:** com `REDIS_URL` (ex.: `redis://localhost:6379`), o `GET /:code` usa Redis (chave `url:{code}`, JSON com `original_url`, `is_active`, `expires_at`, TTL `REDIS_CACHE_TTL` segundos, padrão **3600**). *Miss* carrega do PostgreSQL e repovoa o cache; *hit* válido evita consulta ao banco.
+- **Invalidação:** `PATCH` e `DELETE` em `/api/v1/urls/:code`; detecção de `expires_at` vencido no redirect remove a chave e reconsulta o PG.
+- **Sem Redis:** omita `REDIS_URL` — a API segue só com PostgreSQL.
+- **Health:** `GET /api/v1/health` inclui `cache`: `connected` | `disconnected`. Redis indisponível **não** força `503` se o banco estiver ok.
+- **Docker Compose:** o serviço `redis` (imagem `redis:8.6-alpine` com *healthcheck*) sobe com a API; `api` aguarda `redis` e `db` saudáveis.
+
 ## Docker
 
-Subir API + PostgreSQL:
+Subir API + PostgreSQL + Redis:
 
 ```bash
 docker compose up --build

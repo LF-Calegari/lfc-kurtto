@@ -16,12 +16,24 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:8.6-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   api:
     build:
       context: .
       target: development
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     environment:
       NODE_ENV: ${NODE_ENV:-development}
@@ -34,6 +46,8 @@ services:
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       DB_NAME: ${DB_NAME:-kurtto}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_CACHE_TTL: ${REDIS_CACHE_TTL:-3600}
     ports:
       - "${PORT:-3000}:3000"
       - "9229:9229"
@@ -48,6 +62,8 @@ services:
       target: development
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     environment:
       NODE_ENV: test
@@ -65,6 +81,8 @@ services:
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       DB_NAME: kurtto_test
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_CACHE_TTL: ${REDIS_CACHE_TTL:-3600}
     volumes:
       - .:/app
       - /app/node_modules

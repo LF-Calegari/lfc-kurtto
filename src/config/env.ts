@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
 import { z } from 'zod';
 
-config();
+config({ quiet: true });
 
 const FIFTEEN_MIN_MS = 15 * 60 * 1000;
 const ONE_MIN_MS = 60 * 1000;
@@ -91,6 +91,19 @@ const envSchema = z
      * use `false` para desligar.
      */
     SWAGGER_ENABLED: z.enum(['true', 'false']).optional(),
+    /** Opcional: cache de redirect (ioredis). Sem valor, a API usa só PostgreSQL. */
+    REDIS_URL: z.preprocess((val) => {
+      if (val === undefined || val === null || val === '') {
+        return undefined;
+      }
+      if (typeof val !== 'string') {
+        return undefined;
+      }
+      const s = val.trim();
+      return s === '' ? undefined : s;
+    }, z.string().min(1).optional()),
+    /** TTL em segundos para entradas `url:{code}` no Redis (padrão 3600). */
+    REDIS_CACHE_TTL: z.coerce.number().int().positive().default(3600),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production' && !data.CORS_ORIGINS?.trim()) {

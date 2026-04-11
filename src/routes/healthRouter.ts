@@ -9,7 +9,7 @@ const healthRouter = Router();
  * /health:
  *   get:
  *     summary: Verifica a saude da API
- *     description: Indica se a API responde e se o banco esta acessivel.
+ *     description: Indica se a API responde, se o banco esta acessivel e o status opcional do Redis (cache de redirect); Redis indisponivel nao degrada o health quando apenas o banco esta ok.
  *     tags: [Health]
  *     responses:
  *       200:
@@ -25,6 +25,7 @@ const healthRouter = Router();
  *                 - uptime
  *                 - environment
  *                 - database
+ *                 - cache
  *               properties:
  *                 status:
  *                   type: string
@@ -44,6 +45,10 @@ const healthRouter = Router();
  *                 database:
  *                   type: string
  *                   enum: [connected, disconnected]
+ *                 cache:
+ *                   type: string
+ *                   enum: [connected, disconnected]
+ *                   description: Redis para cache de redirect; disconnected se REDIS_URL ausente ou indisponivel
  *       503:
  *         description: API degradada (banco indisponivel)
  *         content:
@@ -66,6 +71,9 @@ const healthRouter = Router();
  *                 database:
  *                   type: string
  *                   example: disconnected
+ *                 cache:
+ *                   type: string
+ *                   enum: [connected, disconnected]
  */
 healthRouter.get('/', (req, res, next) => {
   void healthController.check(req, res, next).catch(next);

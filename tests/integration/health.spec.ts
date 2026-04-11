@@ -21,6 +21,9 @@ describe('health and errors', () => {
     expect(response.status).toBe(HttpStatusCode.OK);
     expect(response.body.status).toBe('ok');
     expect(response.body.database).toBe('connected');
+    expect(response.body.cache).toBe(
+      process.env.REDIS_URL?.trim() ? 'connected' : 'disconnected',
+    );
     expect(response.body.message).toBe('API is running');
     expect(response.body.environment).toBe('test');
     expect(typeof response.body.uptime).toBe('number');
@@ -38,6 +41,7 @@ describe('health and errors', () => {
 
       expect(response.status).toBe(HttpStatusCode.SERVICE_UNAVAILABLE);
       expect(response.body.database).toBe('disconnected');
+      expect(['connected', 'disconnected']).toContain(response.body.cache);
       expect(response.body.status).toBe('degraded');
     } finally {
       spy.mockRestore();
@@ -53,6 +57,7 @@ describe('health and errors', () => {
       expect(response.status).toBe(HttpStatusCode.SERVICE_UNAVAILABLE);
       expect(response.body.status).toBe('degraded');
       expect(response.body.database).toBe('disconnected');
+      expect(['connected', 'disconnected']).toContain(response.body.cache);
     } finally {
       if (!AppDataSource.isInitialized) {
         await AppDataSource.initialize();

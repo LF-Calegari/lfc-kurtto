@@ -3,7 +3,7 @@ import { config as loadDotenv } from 'dotenv';
 import { deriveIntegrationTestDatabaseUrlForWorker } from
   '@config/test-database';
 
-loadDotenv();
+loadDotenv({ quiet: true });
 
 const baseKurtto = process.env.KURTTO_TEST_DATABASE_URL?.trim();
 const baseLegacy = process.env.DATABASE_URL_TEST?.trim();
