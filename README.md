@@ -1,5 +1,7 @@
 # Kurtto Service
 
+[![CI](https://github.com/LF-Calegari/lfc-kurtto/actions/workflows/ci.yml/badge.svg?branch=development)](https://github.com/LF-Calegari/lfc-kurtto/actions/workflows/ci.yml)
+
 API base do projeto Kurtto para evolucao de funcionalidades de encurtamento de links.
 
 ## Objetivo do projeto (semantico)
@@ -67,7 +69,8 @@ Fluxo:
 - `npm run build`: compila TypeScript para `dist`.
 - `npm run start`: executa build em modo producao.
 - `npm run typecheck`: valida tipos sem gerar build.
-- `npm run lint`: executa lint do projeto.
+- `npm run lint`: executa lint do projeto (ESLint 9, config plana em `eslint.config.mjs`).
+- `npm run lint:fix`: aplica correcoes automaticas do ESLint quando possivel.
 - `npm run test`: executa a suite **Jest** (ESM + `ts-jest`; requer PostgreSQL com migrations aplicadas; veja **Testes** abaixo).
 - `npm run test:watch` / `npm run test:unit` / `npm run test:integration`: variantes Jest com `--runInBand --forceExit`.
 - `npm run test:coverage`: Jest com `--coverage`, relatorio `coverage/lcov.info` e thresholds globais (branches 70%; demais 80%).
@@ -105,7 +108,7 @@ export KURTTO_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/ku
 npm test
 ```
 
-No CI (SonarCloud), o workflow sobe Postgres 18 (`postgres:18-alpine`), cria o banco `kurtto_test` se necessário, define `KURTTO_TEST_DATABASE_URL`, e em seguida lint, typecheck e `npm run test:coverage` (migrations por worker durante os testes de integração).
+No GitHub Actions, o workflow **CI** (`.github/workflows/ci.yml`) executa em `push` em `main` e `development` e em `pull_request` para `main`: job `lint-and-typecheck` (Node 24, `npm ci`, `typecheck`, `lint`) e job `test` com Postgres 18, `pg_isready`, `migration:run` no banco `kurtto`, `DATABASE_URL_TEST` / `KURTTO_TEST_DATABASE_URL`, `npm run test:coverage` e *artifact* `coverage/`. O workflow SonarCloud (`.github/workflows/sonarcloud.yml`) também gera `coverage/lcov.info` para análise e sobe Postgres 18 com as mesmas variáveis de teste; migrations adicionais continuam sendo aplicadas por worker durante os testes de integração.
 
 No Docker Compose, o script `docker/postgres/create-test-db.sh` cria `kurtto_test` na primeira inicialização do volume; o serviço com profile `test` já exporta `KURTTO_TEST_DATABASE_URL` apontando para esse banco.
 
@@ -165,7 +168,24 @@ curl -sI -X OPTIONS "http://localhost:3000/api/v1/urls" \
   -H "Access-Control-Request-Method: POST"
 ```
 
-## CI SonarCloud
+## CI/CD
+
+### GitHub Actions (CI)
+
+- **Workflow:** `.github/workflows/ci.yml` (badge no topo deste README).
+- **Gatilhos:** `push` em `main` e `development`; `pull_request` para `main`.
+- **Jobs:** validacao de tipos e ESLint; testes com Postgres 18, migrations e cobertura com *upload* do diretorio `coverage/` como *artifact*.
+
+### Branch protection (recomendado)
+
+No GitHub: **Settings** > **Branches** > *Add branch protection rule* (ou regra existente) para `main` e, se aplicavel, `development`:
+
+- Exigir *pull request* antes do merge (sem *push* direto em `main`).
+- Exigir que os *status checks* obrigatorios passem (inclua os jobs do workflow **CI** e, se usar, o SonarCloud / *Quality Gate*).
+- Exigir revisao de codigo quando a politica do time assim definir.
+- Considerar **Require linear history** ou **Require branches to be up to date** conforme fluxo de release.
+
+### SonarCloud
 
 O workflow `.github/workflows/sonarcloud.yml` executa em `push` e `pull_request` nas branches `main` e `development`.
 
