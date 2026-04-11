@@ -15,12 +15,26 @@ const devFormat = winston.format.combine(
     const { timestamp, level, message, context } = info;
     let ctx = '';
     if (context !== undefined && context !== null && context !== '') {
-      ctx =
-        typeof context === 'object'
-          ? ` [${JSON.stringify(context)}]`
-          : ` [${String(context)}]`;
+      if (typeof context === 'object') {
+        ctx = ` [${JSON.stringify(context)}]`;
+      } else if (typeof context === 'string') {
+        ctx = ` [${context}]`;
+      } else if (
+        typeof context === 'number' ||
+        typeof context === 'boolean' ||
+        typeof context === 'bigint'
+      ) {
+        ctx = ` [${context}]`;
+      } else if (typeof context === 'symbol') {
+        ctx = ` [${context.toString()}]`;
+      } else if (typeof context === 'function') {
+        const fn = context as { name?: string };
+        ctx = ` [Function: ${fn.name || 'anonymous'}]`;
+      } else {
+        ctx = ' [unknown]';
+      }
     }
-    return `${String(timestamp)} ${level}:${ctx} ${String(message)}`;
+    return `${timestamp} ${level}:${ctx} ${message}`;
   }),
 );
 
