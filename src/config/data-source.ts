@@ -27,9 +27,9 @@ const jestMigrationClasses = [
 ];
 
 const migrationPaths =
-  process.env.JEST_WORKER_ID !== undefined
-    ? jestMigrationClasses
-    : [migrationsGlob];
+  process.env.JEST_WORKER_ID === undefined
+    ? [migrationsGlob]
+    : jestMigrationClasses;
 
 export type CreateAppDataSourceOptions = {
   /**

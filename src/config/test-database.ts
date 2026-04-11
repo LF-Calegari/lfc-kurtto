@@ -74,7 +74,7 @@ export function deriveIntegrationTestDatabaseUrlForWorker(
 }
 
 function quoteIdent(ident: string): string {
-  return `"${ident.replace(/"/g, '""')}"`;
+  return `"${ident.replaceAll('"', '""')}"`;
 }
 
 /**
@@ -97,10 +97,10 @@ export async function ensurePostgresDatabaseExists(
   });
   await adminDs.initialize();
   try {
-    const rows = (await adminDs.query(
+    const rows = await adminDs.query(
       'SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1) AS "exists"',
       [dbName],
-    )) as { exists: boolean }[];
+    );
     const exists = rows[0]?.exists === true;
     if (!exists) {
       await adminDs.query(`CREATE DATABASE ${quoteIdent(dbName)}`);

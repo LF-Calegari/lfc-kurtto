@@ -61,6 +61,10 @@ describe('env.ts (recarregado via resetModules)', () => {
 
   it('RATE_LIMIT_GLOBAL_MAX padrão em development', async () => {
     process.env.NODE_ENV = 'development';
+    // Compose/CI injetam limites altos no serviço `test`; remover para validar o default Zod em development.
+    delete process.env.RATE_LIMIT_GLOBAL_MAX;
+    delete process.env.RATE_LIMIT_POST_URLS_MAX;
+    delete process.env.RATE_LIMIT_REDIRECT_MAX;
     const { env } = await import('@config/env');
     expect(env.RATE_LIMIT_GLOBAL_MAX).toBe(100);
   });
