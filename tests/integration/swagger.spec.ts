@@ -14,7 +14,7 @@ describe('Swagger OpenAPI', () => {
     const body = response.body as Record<string, unknown>;
     expect(body.openapi).toBe('3.0.0');
     expect(body.info).toMatchObject({
-      title: 'kurtto API',
+      title: 'Kurtto API',
       version: '1.0.0',
     });
     const info = body.info as { 'x-logo'?: { url?: string } };

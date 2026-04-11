@@ -29,7 +29,7 @@ const getRouteApiGlobs = (): string[] => {
 const openApiDefinition = {
   openapi: '3.0.0',
   info: {
-    title: 'kurtto API',
+    title: 'Kurtto API',
     version: '1.0.0',
     description:
       'API HTTP para **criar, consultar e atualizar** links encurtados e ' +
@@ -225,7 +225,7 @@ export function setupSwagger(app: Express): void {
     '/api/docs',
     swaggerUi.serve,
     swaggerUi.setup(spec, {
-      customSiteTitle: 'kurtto API · documentação',
+      customSiteTitle: 'Kurtto API · documentação',
       customCssUrl: `${SWAGGER_STATIC_BASE}/css/swagger-custom.css`,
       customfavIcon: `${SWAGGER_STATIC_BASE}/images/kurtto-favicon.svg`,
       swaggerOptions: {

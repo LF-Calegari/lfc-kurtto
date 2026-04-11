@@ -33,7 +33,7 @@ describe('Swagger habilitado', () => {
   it('buildSwaggerSpec retorna OpenAPI 3.0', () => {
     const spec = buildSwaggerSpec();
     expect(spec.openapi).toBe('3.0.0');
-    expect(spec.info).toMatchObject({ title: 'kurtto API' });
+    expect(spec.info).toMatchObject({ title: 'Kurtto API' });
   });
 
   it('GET /api/docs.json retorna o spec', async () => {
