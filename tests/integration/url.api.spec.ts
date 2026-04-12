@@ -231,7 +231,7 @@ describe('URL API and redirect', () => {
     expect(res.body.deletedAt).toBeTruthy();
   });
 
-  it('POST restore clears deletedAt and default GET works', async () => {
+  it('PATCH restore clears deletedAt and default GET works', async () => {
     const code = `rs${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://restore.example.com',
@@ -240,7 +240,7 @@ describe('URL API and redirect', () => {
     await request(app).delete(`/api/v1/urls/${code}`);
 
     const rest = await request(app)
-      .post(`/api/v1/urls/${code}/restore`)
+      .patch(`/api/v1/urls/${code}/restore`)
       .set(adminHeaders);
     expect(rest.status).toBe(HttpStatusCode.OK);
     expect(rest.body.deletedAt).toBeNull();
@@ -250,7 +250,33 @@ describe('URL API and redirect', () => {
     expect(getOne.body.shortCode).toBe(code);
   });
 
-  it('POST restore returns 422 when URL is not soft-deleted', async () => {
+  it('PATCH restore without X-Admin-Secret returns 403', async () => {
+    const code = `ra${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://restore-admin.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+
+    const res = await request(app).patch(`/api/v1/urls/${code}/restore`);
+    expect(res.status).toBe(HttpStatusCode.FORBIDDEN);
+  });
+
+  it('POST /api/v1/urls/:code/restore is not supported (404)', async () => {
+    const code = `np${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://legacy-post-restore.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+
+    const res = await request(app)
+      .post(`/api/v1/urls/${code}/restore`)
+      .set(adminHeaders);
+    expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
+  });
+
+  it('PATCH restore returns 422 when URL is not soft-deleted', async () => {
     const code = `nr${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://not-restore.example.com',
@@ -258,20 +284,20 @@ describe('URL API and redirect', () => {
     });
 
     const res = await request(app)
-      .post(`/api/v1/urls/${code}/restore`)
+      .patch(`/api/v1/urls/${code}/restore`)
       .set(adminHeaders);
     expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
     expect(res.body.message).toBe('URL is not soft-deleted');
   });
 
-  it('POST restore returns 404 for unknown short code', async () => {
+  it('PATCH restore returns 404 for unknown short code', async () => {
     const res = await request(app)
-      .post('/api/v1/urls/zzzzzzzzzz/restore')
+      .patch('/api/v1/urls/zzzzzzzzzz/restore')
       .set(adminHeaders);
     expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
   });
 
-  it('POST restore 422 when short code active after reuse', async () => {
+  it('PATCH restore 422 when short code active after reuse', async () => {
     const code = `ru${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://reuse-restore-a.example.com',
@@ -284,13 +310,13 @@ describe('URL API and redirect', () => {
     });
 
     const res = await request(app)
-      .post(`/api/v1/urls/${code}/restore`)
+      .patch(`/api/v1/urls/${code}/restore`)
       .set(adminHeaders);
     expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
     expect(res.body.message).toBe('URL is not soft-deleted');
   });
 
-  it('POST restore: two tombstones, second restore 422', async () => {
+  it('PATCH restore: two tombstones, second restore 422', async () => {
     const code = `tb${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://tomb-a.example.com',
@@ -304,7 +330,7 @@ describe('URL API and redirect', () => {
     await request(app).delete(`/api/v1/urls/${code}`);
 
     const rest1 = await request(app)
-      .post(`/api/v1/urls/${code}/restore`)
+      .patch(`/api/v1/urls/${code}/restore`)
       .set(adminHeaders);
     expect(rest1.status).toBe(HttpStatusCode.OK);
 
@@ -314,7 +340,7 @@ describe('URL API and redirect', () => {
     expect(activeCount).toBe(1);
 
     const rest2 = await request(app)
-      .post(`/api/v1/urls/${code}/restore`)
+      .patch(`/api/v1/urls/${code}/restore`)
       .set(adminHeaders);
     expect(rest2.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
     expect(rest2.body.message).toBe('URL is not soft-deleted');
