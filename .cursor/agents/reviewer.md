@@ -207,7 +207,13 @@ Se não → BLOCKER
 
 Antes de aprovar, verificar CI ou evidências no PR:
 
-- **lint** (`npm run lint` ou equivalente)
+- **ESLint** — deve ter sido executado via Docker:
+  ```bash
+  docker run -it --rm -v ./:/app -w /app node:24-alpine npm run lint
+  ```
+  - Resultado deve ser zero errors e zero warnings
+  - Uso de `eslint-disable` sem justificativa → NEEDS IMPROVEMENT
+  - Alteração na configuração do ESLint sem necessidade da issue → BLOCKER
 - **typecheck** (`tsc --noEmit`, `npm run build`, ou script do projeto)
 - **testes** (`npm test` ou equivalente)
 - Quando rodado localmente, priorizar execução em Docker/Compose com imagens compatíveis ao projeto
