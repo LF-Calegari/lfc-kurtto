@@ -4,7 +4,6 @@ import { AppError } from '@errors/AppError';
 import { NotFoundError } from '@errors/NotFoundError';
 import { ValidationError } from '@errors/ValidationError';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
-import { requireAdminOperation } from '@utils/adminAuth';
 import {
   GetUrlByCodeQuerySchema,
   ListUrlsQuerySchema,
@@ -30,9 +29,6 @@ class UrlController {
     if (!parsed.success) {
       throw new ValidationError(zodErrorResponse(parsed.error));
     }
-    if (parsed.data.include_deleted === true) {
-      requireAdminOperation(req);
-    }
     const result = await urlService.list(parsed.data);
     res.status(HttpStatusCode.OK).json(result);
   }
@@ -42,9 +38,6 @@ class UrlController {
     const q = GetUrlByCodeQuerySchema.safeParse(req.query);
     if (!q.success) {
       throw new ValidationError(zodErrorResponse(q.error));
-    }
-    if (q.data.include_deleted === true) {
-      requireAdminOperation(req);
     }
     const url = await urlService.getByShortCode(code, {
       withDeleted: q.data.include_deleted === true,
@@ -74,7 +67,6 @@ class UrlController {
   }
 
   public async restore(req: Request, res: Response): Promise<void> {
-    requireAdminOperation(req);
     const code = routeParam(req.params.code);
     const restored = await urlService.restore(code);
     if (!restored) {
