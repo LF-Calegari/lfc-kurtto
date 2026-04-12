@@ -271,6 +271,60 @@ describe('URL API and redirect', () => {
     expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
   });
 
+  it('POST restore 422 when short code active after reuse', async () => {
+    const code = `ru${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://reuse-restore-a.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://reuse-restore-b.example.com',
+      customCode: code,
+    });
+
+    const res = await request(app)
+      .post(`/api/v1/urls/${code}/restore`)
+      .set(adminHeaders);
+    expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+    expect(res.body.message).toBe('URL is not soft-deleted');
+  });
+
+  it('POST restore: two tombstones, second restore 422', async () => {
+    const code = `tb${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://tomb-a.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://tomb-b.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+
+    const rest1 = await request(app)
+      .post(`/api/v1/urls/${code}/restore`)
+      .set(adminHeaders);
+    expect(rest1.status).toBe(HttpStatusCode.OK);
+
+    const activeCount = await AppDataSource.getRepository(Url).count({
+      where: { shortCode: code },
+    });
+    expect(activeCount).toBe(1);
+
+    const rest2 = await request(app)
+      .post(`/api/v1/urls/${code}/restore`)
+      .set(adminHeaders);
+    expect(rest2.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+    expect(rest2.body.message).toBe('URL is not soft-deleted');
+
+    const activeAfter = await AppDataSource.getRepository(Url).count({
+      where: { shortCode: code },
+    });
+    expect(activeAfter).toBe(1);
+  });
+
   it('POST same custom_code after soft delete on prior row: 201', async () => {
     const code = `rc${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
@@ -285,6 +339,29 @@ describe('URL API and redirect', () => {
     });
     expect(second.status).toBe(HttpStatusCode.CREATED);
     expect(second.body.shortCode).toBe(code);
+  });
+
+  it('include_deleted GET after reuse returns active row body', async () => {
+    const code = `id${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://reuse-detail-a.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+
+    const second = await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://reuse-detail-b.example.com',
+      customCode: code,
+    });
+    expect(second.status).toBe(HttpStatusCode.CREATED);
+
+    const res = await request(app)
+      .get(`/api/v1/urls/${code}?include_deleted=true`)
+      .set(adminHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    expect(res.body.shortCode).toBe(code);
+    expect(res.body.deletedAt).toBeNull();
+    expect(res.body.originalUrl).toBe('https://reuse-detail-b.example.com');
   });
 
   it('second DELETE on same code after soft delete returns 404', async () => {

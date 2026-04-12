@@ -76,19 +76,17 @@ class UrlController {
   public async restore(req: Request, res: Response): Promise<void> {
     requireAdminOperation(req);
     const code = routeParam(req.params.code);
-    const existing = await urlService.getByShortCode(code, {
-      withDeleted: true,
-    });
-    if (!existing) {
+    const restored = await urlService.restore(code);
+    if (!restored) {
+      const active = await urlService.getByShortCode(code);
+      if (active) {
+        throw new AppError(
+          'URL is not soft-deleted',
+          HttpStatusCode.UNPROCESSABLE_ENTITY,
+        );
+      }
       throw new NotFoundError('URL not found');
     }
-    if (existing.deletedAt === null) {
-      throw new AppError(
-        'URL is not soft-deleted',
-        HttpStatusCode.UNPROCESSABLE_ENTITY,
-      );
-    }
-    await urlService.restore(code);
     const url = await urlService.getByShortCode(code);
     if (!url) {
       throw new NotFoundError('URL not found');

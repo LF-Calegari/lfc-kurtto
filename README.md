@@ -58,7 +58,7 @@ Fluxo:
 | `GET` | `/api/v1/urls/:code` | Detalhe por `short_code` (`200` ou `404`). `include_deleted=true` + `X-Admin-Secret` retorna registro soft-deleted. Respostas incluem `deletedAt` (`null` ou ISO 8601). |
 | `PATCH` | `/api/v1/urls/:code` | Atualizacao parcial (sem `short_code`/`clicks`; `404` se inexistente ou soft-deleted). |
 | `DELETE` | `/api/v1/urls/:code` | Soft delete: preenche `deleted_at` (`204` ou `404`; segundo delete do mesmo codigo -> `404`). |
-| `POST` | `/api/v1/urls/:code/restore` | Remove soft delete (`200` + corpo URL; exige `X-Admin-Secret`; `404` codigo inexistente; `422` se nao estava soft-deleted; `403` se admin nao configurado ou secret invalido). |
+| `POST` | `/api/v1/urls/:code/restore` | Remove soft delete (`200` + corpo URL; exige `X-Admin-Secret`; `404` sem tumba; `422` se ja existe URL ativa com o codigo ou nao havia soft delete; restaura no maximo a tumba mais recente quando ha varias; `403` se admin invalido). |
 
 ## Documentacao interativa (Swagger)
 
