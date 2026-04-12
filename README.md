@@ -22,6 +22,8 @@ do tempo.
 
 - Node.js 24 LTS+
 - Docker e Docker Compose
+- Rede Docker externa obrigatoria, **compartilhada** com os demais servicos do ecossistema (ex.: **Auth Service**), com no maximo 30 IPs disponiveis
+  (exemplo: subnet `/27`, com 30 IPs uteis; nome padrao da rede: `lfc_platform_network`)
 
 ## Getting started
 
@@ -124,6 +126,20 @@ No Docker Compose, o script `docker/postgres/create-test-db.sh` cria `kurtto_tes
 - **Docker Compose:** o serviço `redis` (imagem `redis:8.6-alpine` com *healthcheck*) sobe com a API; `api` aguarda `redis` e `db` saudáveis.
 
 ## Docker
+
+O Kurtto participa do **mesmo sistema** que outros servicos (por exemplo, **Auth Service**): em Docker, todos devem estar na **mesma rede externa** para se comunicarem entre si por nome de servico ou hostname interno.
+
+Antes de subir os servicos, garanta que a rede externa exista:
+
+```bash
+docker network create \
+  --driver bridge \
+  --subnet 172.30.0.0/27 \
+  lfc_platform_network
+```
+
+> A stack usa a rede externa `lfc_platform_network` por padrao. Se precisar usar outro
+> nome, defina `EXTERNAL_NETWORK_NAME` no ambiente antes de executar o compose.
 
 Subir API + PostgreSQL + Redis:
 
