@@ -119,6 +119,12 @@ const envSchema = z
     AUTH_SERVICE_AUTHORIZE_ROUTE_PATH: z
       .string()
       .min(1)
+      .refine((value) => !value.includes('://'), {
+        message: [
+          'AUTH_SERVICE_AUTHORIZE_ROUTE_PATH must be a path,',
+          'not an absolute URL',
+        ].join(' '),
+      })
       .default('/api/v1/auth/authorize-route'),
     /** Timeout (ms) da chamada de autorização ao auth-service. */
     AUTH_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),

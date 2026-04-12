@@ -39,10 +39,16 @@ function normalizedRoutePath(req: Request): string {
 }
 
 function buildAuthorizationEndpoint(): URL {
+  const baseUrl = new URL(env.AUTH_SERVICE_URL);
   const path = env.AUTH_SERVICE_AUTHORIZE_ROUTE_PATH.startsWith('/')
     ? env.AUTH_SERVICE_AUTHORIZE_ROUTE_PATH
     : `/${env.AUTH_SERVICE_AUTHORIZE_ROUTE_PATH}`;
-  return new URL(path, env.AUTH_SERVICE_URL);
+
+  // Preserve host/protocol from AUTH_SERVICE_URL and only replace pathname.
+  baseUrl.pathname = path;
+  baseUrl.search = '';
+  baseUrl.hash = '';
+  return baseUrl;
 }
 
 async function callAuthService(
