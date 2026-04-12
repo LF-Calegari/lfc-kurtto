@@ -53,7 +53,7 @@ urlRouter.post(
 /**
  * @swagger
  * /urls/{code}/restore:
- *   post:
+ *   patch:
  *     summary: Reativa URL soft-deleted
  *     tags: [Urls]
  *     parameters:
@@ -80,7 +80,7 @@ urlRouter.post(
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-urlRouter.post('/:code/restore', (req, res, next) => {
+urlRouter.patch('/:code/restore', (req, res, next) => {
   void urlController.restore(req, res).catch(next);
 });
 
