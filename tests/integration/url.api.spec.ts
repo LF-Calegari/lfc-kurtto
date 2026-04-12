@@ -436,6 +436,17 @@ describe('URL API and redirect', () => {
     expect(res.status).toBe(HttpStatusCode.FORBIDDEN);
   });
 
+  it('include_deleted list with bearer when auth-service returns 401', async () => {
+    mockAuthServiceResponse(HttpStatusCode.UNAUTHORIZED);
+    const res = await request(app)
+      .get('/api/v1/urls?include_deleted=true')
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.UNAUTHORIZED);
+    expect(res.body.message).toBe(
+      'Unauthorized: token missing, invalid, or expired.',
+    );
+  });
+
   it(
     'include_deleted envia method/path normalizados para auth-service',
     async () => {
