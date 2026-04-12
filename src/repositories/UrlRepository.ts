@@ -3,9 +3,23 @@ import { Url } from '@entities/Url';
 
 export async function findUrlByShortCode(
   shortCode: string,
+  options?: { withDeleted?: boolean },
 ): Promise<Url | null> {
   const repo = AppDataSource.getRepository(Url);
-  return repo.findOne({ where: { shortCode } });
+  const withDeleted = options?.withDeleted === true;
+  return repo.findOne({
+    where: { shortCode },
+    withDeleted,
+    ...(withDeleted
+      ? {
+        /**
+         * PostgreSQL: `ORDER BY deleted_at DESC` coloca NULL primeiro (linha ativa),
+         * depois tumbas da mais recente à mais antiga — alinhado ao restore.
+         */
+        order: { deletedAt: 'DESC' },
+      }
+      : {}),
+  });
 }
 
 export async function saveUrl(entity: Url): Promise<Url> {
@@ -32,6 +46,7 @@ export async function listUrls(params: {
   page: number;
   limit: number;
   active?: boolean;
+  withDeleted?: boolean;
 }): Promise<{ rows: Url[]; total: number }> {
   const repo = AppDataSource.getRepository(Url);
   const where =
@@ -42,6 +57,7 @@ export async function listUrls(params: {
     order: { createdAt: 'DESC' },
     skip: (params.page - 1) * params.limit,
     take: params.limit,
+    withDeleted: params.withDeleted === true,
   });
 
   return { rows, total };
@@ -72,11 +88,42 @@ export async function updateUrlByShortCode(
   return repo.save(existing);
 }
 
-export async function hardDeleteUrlByShortCode(
+export async function softDeleteUrlByShortCode(
   shortCode: string,
 ): Promise<boolean> {
   const repo = AppDataSource.getRepository(Url);
-  const result = await repo.delete({ shortCode });
+  const existing = await repo.findOne({ where: { shortCode } });
+  if (!existing) {
+    return false;
+  }
+  const result = await repo.softDelete({ id: existing.id });
+  return (result.affected ?? 0) > 0;
+}
+
+/**
+ * Reativa no maximo uma linha soft-deleted: a mais recentemente excluida.
+ * Nao altera nada se ja existir URL ativa com o mesmo `short_code` (evita violar
+ * indice unico parcial e evita restaurar multiplas tumbas de uma vez).
+ */
+export async function restoreUrlByShortCode(
+  shortCode: string,
+): Promise<boolean> {
+  const repo = AppDataSource.getRepository(Url);
+  const active = await repo.findOne({ where: { shortCode } });
+  if (active) {
+    return false;
+  }
+  const tombstone = await repo
+    .createQueryBuilder('url')
+    .withDeleted()
+    .where('url.shortCode = :code', { code: shortCode })
+    .andWhere('url.deletedAt IS NOT NULL')
+    .orderBy('url.deletedAt', 'DESC')
+    .getOne();
+  if (!tombstone) {
+    return false;
+  }
+  const result = await repo.restore({ id: tombstone.id });
   return (result.affected ?? 0) > 0;
 }
 

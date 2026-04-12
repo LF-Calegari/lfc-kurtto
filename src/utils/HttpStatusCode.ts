@@ -7,6 +7,7 @@ export class HttpStatusCode {
   static readonly FOUND = 302;
   static readonly BAD_REQUEST = 400;
   static readonly NOT_FOUND = 404;
+  static readonly FORBIDDEN = 403;
   static readonly CONFLICT = 409;
   static readonly GONE = 410;
   static readonly UNPROCESSABLE_ENTITY = 422;

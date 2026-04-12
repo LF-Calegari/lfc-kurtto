@@ -131,7 +131,13 @@ Se houver risco, mitigar ou documentar.
 
 Antes de finalizar:
 
-- **lint** OK (`npm run lint` ou equivalente no `package.json`)
+- **ESLint** OK — rodar obrigatoriamente via Docker:
+  ```bash
+  docker run -it --rm -v ./:/app -w /app node:24-alpine npm run lint
+  ```
+  - Zero errors e zero warnings antes de commitar
+  - Não usar `eslint-disable` sem justificativa documentada no código
+  - Não criar, sobrescrever ou alterar a configuração do ESLint do projeto
 - **typecheck** OK (`npm run build`, `tsc --noEmit`, ou script dedicado)
 - **testes** OK (`npm test` ou equivalente)
 - sem segredo exposto (`.env`, credenciais PostgreSQL, JWT secrets, etc.)
