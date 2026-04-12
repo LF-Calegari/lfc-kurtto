@@ -9,7 +9,10 @@ import {
 } from 'typeorm';
 
 @Entity('urls')
-@Index('IDX_urls_short_code', ['shortCode'], { unique: true })
+@Index('IDX_urls_short_code', ['shortCode'], {
+  unique: true,
+  where: '"deleted_at" IS NULL',
+})
 @Index('IDX_urls_created_at', ['createdAt'])
 export class Url {
   @PrimaryGeneratedColumn('uuid')

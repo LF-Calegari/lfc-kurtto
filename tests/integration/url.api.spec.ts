@@ -10,6 +10,9 @@ import { useIntegrationDatabase } from '../helpers/setup';
 
 useIntegrationDatabase();
 
+const ADMIN_SECRET = 'test-admin-secret';
+const adminHeaders = { 'X-Admin-Secret': ADMIN_SECRET };
+
 async function waitForClicks(
   shortCode: string,
   minClicks: number,
@@ -150,7 +153,7 @@ describe('URL API and redirect', () => {
     expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
   });
 
-  it('DELETE /api/v1/urls/:code: 204 then GET 404', async () => {
+  it('DELETE soft delete: 204, row has deletedAt, GET detail 404', async () => {
     const code = `g${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://delete.example.com',
@@ -160,8 +163,146 @@ describe('URL API and redirect', () => {
     const del = await request(app).delete(`/api/v1/urls/${code}`);
     expect(del.status).toBe(HttpStatusCode.NO_CONTENT);
 
+    const row = await AppDataSource.getRepository(Url).findOne({
+      where: { shortCode: code },
+      withDeleted: true,
+    });
+    expect(row?.deletedAt).toBeTruthy();
+
     const getOne = await request(app).get(`/api/v1/urls/${code}`);
     expect(getOne.status).toBe(HttpStatusCode.NOT_FOUND);
+  });
+
+  it('default list omits soft-deleted rows', async () => {
+    const code = `sd${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://soft-list.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+
+    const res = await request(app).get('/api/v1/urls?limit=100');
+    expect(res.status).toBe(HttpStatusCode.OK);
+    const found = res.body.data.find(
+      (row: { shortCode: string }) => row.shortCode === code,
+    );
+    expect(found).toBeUndefined();
+  });
+
+  it('include_deleted list without admin header: 403', async () => {
+    const res = await request(app).get(
+      '/api/v1/urls?include_deleted=true',
+    );
+    expect(res.status).toBe(HttpStatusCode.FORBIDDEN);
+  });
+
+  it('include_deleted list with valid admin shows deleted rows', async () => {
+    const code = `ad${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://admin-list.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+
+    const res = await request(app)
+      .get('/api/v1/urls?include_deleted=true&limit=100')
+      .set(adminHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    const found = res.body.data.find(
+      (row: { shortCode: string }) => row.shortCode === code,
+    );
+    expect(found).toBeTruthy();
+    expect(found.deletedAt).toBeTruthy();
+  });
+
+  it('GET detail with include_deleted and admin returns row', async () => {
+    const code = `gd${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://get-deleted.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+
+    const res = await request(app)
+      .get(`/api/v1/urls/${code}?include_deleted=true`)
+      .set(adminHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    expect(res.body.shortCode).toBe(code);
+    expect(res.body.deletedAt).toBeTruthy();
+  });
+
+  it('POST restore clears deletedAt and default GET works', async () => {
+    const code = `rs${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://restore.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+
+    const rest = await request(app)
+      .post(`/api/v1/urls/${code}/restore`)
+      .set(adminHeaders);
+    expect(rest.status).toBe(HttpStatusCode.OK);
+    expect(rest.body.deletedAt).toBeNull();
+
+    const getOne = await request(app).get(`/api/v1/urls/${code}`);
+    expect(getOne.status).toBe(HttpStatusCode.OK);
+    expect(getOne.body.shortCode).toBe(code);
+  });
+
+  it('POST restore returns 422 when URL is not soft-deleted', async () => {
+    const code = `nr${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://not-restore.example.com',
+      customCode: code,
+    });
+
+    const res = await request(app)
+      .post(`/api/v1/urls/${code}/restore`)
+      .set(adminHeaders);
+    expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+    expect(res.body.message).toBe('URL is not soft-deleted');
+  });
+
+  it('POST restore returns 404 for unknown short code', async () => {
+    const res = await request(app)
+      .post('/api/v1/urls/zzzzzzzzzz/restore')
+      .set(adminHeaders);
+    expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
+  });
+
+  it('POST same custom_code after soft delete on prior row: 201', async () => {
+    const code = `rc${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://reuse-a.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+
+    const second = await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://reuse-b.example.com',
+      customCode: code,
+    });
+    expect(second.status).toBe(HttpStatusCode.CREATED);
+    expect(second.body.shortCode).toBe(code);
+  });
+
+  it('second DELETE on same code after soft delete returns 404', async () => {
+    const code = `2d${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://twicedel.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+    const again = await request(app).delete(`/api/v1/urls/${code}`);
+    expect(again.status).toBe(HttpStatusCode.NOT_FOUND);
+  });
+
+  it('include_deleted list with wrong admin secret: 403', async () => {
+    const res = await request(app)
+      .get('/api/v1/urls?include_deleted=true')
+      .set({ 'X-Admin-Secret': 'wrong' });
+    expect(res.status).toBe(HttpStatusCode.FORBIDDEN);
   });
 
   it('DELETE /api/v1/urls/:code returns 404 when missing', async () => {

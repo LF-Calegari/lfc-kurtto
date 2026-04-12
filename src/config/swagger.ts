@@ -67,8 +67,8 @@ const openApiDefinition = {
     {
       name: 'Urls',
       description:
-        'Criacao, listagem, detalhe, atualizacao e remocao de URLs ' +
-        'encurtadas.',
+        'Criacao, listagem, detalhe, atualizacao, soft delete e restore de ' +
+        'URLs encurtadas.',
     },
     {
       name: 'Redirect',
@@ -91,6 +91,7 @@ const openApiDefinition = {
           'expiresAt',
           'createdAt',
           'updatedAt',
+          'deletedAt',
         ],
         properties: {
           id: { type: 'string', format: 'uuid' },
@@ -106,6 +107,12 @@ const openApiDefinition = {
           },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
+          deletedAt: {
+            type: 'string',
+            format: 'date-time',
+            nullable: true,
+            description: 'Preenchido quando a URL foi removida por soft delete',
+          },
         },
       },
       CreateUrlRequest: {

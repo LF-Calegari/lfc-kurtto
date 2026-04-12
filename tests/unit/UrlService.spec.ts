@@ -9,7 +9,8 @@ const repoMocks = {
   saveUrl: jest.fn(),
   listUrls: jest.fn(),
   updateUrlByShortCode: jest.fn(),
-  hardDeleteUrlByShortCode: jest.fn(),
+  softDeleteUrlByShortCode: jest.fn(),
+  restoreUrlByShortCode: jest.fn(),
   incrementClicksAtomic: jest.fn(),
 };
 

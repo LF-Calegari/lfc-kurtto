@@ -52,6 +52,40 @@ urlRouter.post(
 
 /**
  * @swagger
+ * /urls/{code}/restore:
+ *   post:
+ *     summary: Reativa URL soft-deleted
+ *     tags: [Urls]
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Restaurado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UrlResponse'
+ *       403:
+ *         description: Proibido (sem secret ou secret invalido)
+ *       404:
+ *         description: Codigo inexistente
+ *       422:
+ *         description: URL nao esta soft-deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+urlRouter.post('/:code/restore', (req, res, next) => {
+  void urlController.restore(req, res).catch(next);
+});
+
+/**
+ * @swagger
  * /urls:
  *   get:
  *     summary: Lista URLs paginada
@@ -76,6 +110,12 @@ urlRouter.post(
  *         schema:
  *           type: string
  *           enum: [true, false]
+ *       - in: query
+ *         name: include_deleted
+ *         description: Inclui URLs soft-deleted (exige header X-Admin-Secret)
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
  *     responses:
  *       200:
  *         description: Lista paginada
@@ -83,6 +123,8 @@ urlRouter.post(
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/PaginatedResponse'
+ *       403:
+ *         description: include_deleted sem autorizacao admin
  *       422:
  *         description: Query invalida
  *         content:
@@ -106,6 +148,12 @@ urlRouter.get('/', (req, res, next) => {
  *         required: true
  *         schema:
  *           type: string
+ *       - in: query
+ *         name: include_deleted
+ *         description: Inclui registro soft-deleted (exige X-Admin-Secret)
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
  *     responses:
  *       200:
  *         description: Encontrado
@@ -113,6 +161,8 @@ urlRouter.get('/', (req, res, next) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/UrlResponse'
+ *       403:
+ *         description: include_deleted sem autorizacao admin
  *       404:
  *         description: Nao encontrado
  *         content:
@@ -174,7 +224,7 @@ urlRouter.patch(
  * @swagger
  * /urls/{code}:
  *   delete:
- *     summary: Remove URL permanentemente
+ *     summary: Soft delete (marca deleted_at; nao remove a linha)
  *     tags: [Urls]
  *     parameters:
  *       - in: path
@@ -184,7 +234,7 @@ urlRouter.patch(
  *           type: string
  *     responses:
  *       204:
- *         description: Removido (sem corpo)
+ *         description: Removido logicamente (sem corpo)
  *       404:
  *         description: Nao encontrado
  *         content:

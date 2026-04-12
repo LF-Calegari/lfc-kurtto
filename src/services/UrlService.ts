@@ -14,10 +14,11 @@ import type { Url } from '@entities/Url';
 import {
   createUrlEntity,
   findUrlByShortCode,
-  hardDeleteUrlByShortCode,
   incrementClicksAtomic,
   listUrls,
+  restoreUrlByShortCode,
   saveUrl,
+  softDeleteUrlByShortCode,
   updateUrlByShortCode,
 } from '@repositories/UrlRepository';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
@@ -56,6 +57,7 @@ export function serializeUrl(url: Url): Record<string, unknown> {
     expiresAt: url.expiresAt?.toISOString() ?? null,
     createdAt: url.createdAt.toISOString(),
     updatedAt: url.updatedAt.toISOString(),
+    deletedAt: url.deletedAt?.toISOString() ?? null,
   };
 }
 
@@ -132,6 +134,7 @@ export class UrlService {
       page: query.page,
       limit: query.limit,
       active: query.active,
+      withDeleted: query.include_deleted === true,
     });
     const totalPages =
       total === 0 ? 0 : Math.ceil(total / query.limit);
@@ -146,8 +149,11 @@ export class UrlService {
     };
   }
 
-  public async getByShortCode(shortCode: string): Promise<Url | null> {
-    return findUrlByShortCode(shortCode);
+  public async getByShortCode(
+    shortCode: string,
+    options?: { withDeleted?: boolean },
+  ): Promise<Url | null> {
+    return findUrlByShortCode(shortCode, options);
   }
 
   public async resolveRedirect(shortCode: string): Promise<RedirectResolution> {
@@ -234,12 +240,21 @@ export class UrlService {
   }
 
   public async remove(shortCode: string): Promise<boolean> {
-    const removed = await hardDeleteUrlByShortCode(shortCode);
+    const removed = await softDeleteUrlByShortCode(shortCode);
     if (removed) {
       await cacheService.delete(shortCode);
-      logger.info('hard deleted', { context: 'url', shortCode });
+      logger.info('soft deleted', { context: 'url', shortCode });
     }
     return removed;
+  }
+
+  public async restore(shortCode: string): Promise<boolean> {
+    const restored = await restoreUrlByShortCode(shortCode);
+    if (restored) {
+      await cacheService.delete(shortCode);
+      logger.info('restored from soft delete', { context: 'url', shortCode });
+    }
+    return restored;
   }
 }
 
