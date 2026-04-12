@@ -48,6 +48,7 @@ services:
       DB_NAME: ${DB_NAME:-kurtto}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       REDIS_CACHE_TTL: ${REDIS_CACHE_TTL:-3600}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth-service:5052}
     ports:
       - "${PORT:-3000}:3000"
       - "9229:9229"
@@ -83,6 +84,7 @@ services:
       DB_NAME: kurtto_test
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       REDIS_CACHE_TTL: ${REDIS_CACHE_TTL:-3600}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth-service:5052}
     volumes:
       - .:/app
       - /app/node_modules

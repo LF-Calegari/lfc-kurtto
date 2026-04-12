@@ -111,7 +111,7 @@ const envSchema = z
     /** TTL em segundos para entradas `url:{code}` no Redis (padrão 3600). */
     REDIS_CACHE_TTL: z.coerce.number().int().positive().default(3600),
     /** Base URL do auth-service para validação de autorização por rota. */
-    AUTH_SERVICE_URL: z.url().default('http://auth-service:5052'),
+    AUTH_SERVICE_URL: z.url(),
     /**
      * Path do endpoint no auth-service que valida autorização por rota.
      * A URL final fica: AUTH_SERVICE_URL + AUTH_SERVICE_AUTHORIZE_ROUTE_PATH.
