@@ -8,6 +8,14 @@ on:
   pull_request:
     branches:
       - main
+      - development
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   lint-and-typecheck:
