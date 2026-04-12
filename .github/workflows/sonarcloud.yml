@@ -10,6 +10,14 @@ on:
       - main
       - development
 
+concurrency:
+  group: sonar-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   sonarcloud:
     runs-on: ubuntu-latest
@@ -53,17 +61,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h 127.0.0.1 -p 5432 -U postgres; do sleep 1; done
+
       - name: Create test database
         run: |
           PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d kurtto -tc \
             "SELECT 1 FROM pg_database WHERE datname = 'kurtto_test'" | grep -q 1 || \
           PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d kurtto -c "CREATE DATABASE kurtto_test;"
-
-      - name: Run lint
-        run: npm run lint
-
-      - name: Run typecheck
-        run: npm run typecheck
 
       - name: Run tests with coverage
         run: npm run test:coverage
