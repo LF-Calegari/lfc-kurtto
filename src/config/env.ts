@@ -110,21 +110,24 @@ const envSchema = z
     }, z.string().min(1).optional()),
     /** TTL em segundos para entradas `url:{code}` no Redis (padrão 3600). */
     REDIS_CACHE_TTL: z.coerce.number().int().positive().default(3600),
+    /** Base URL do auth-service para validação de autorização por rota. */
+    AUTH_SERVICE_URL: z.url(),
     /**
-     * Segredo para operações administrativas (listar URLs soft-deleted,
-     * `PATCH .../restore`). Envie no header `X-Admin-Secret`. Se ausente, essas
-     * operações respondem 403.
+     * Path do endpoint no auth-service que valida autorização por rota.
+     * A URL final fica: AUTH_SERVICE_URL + AUTH_SERVICE_AUTHORIZE_ROUTE_PATH.
      */
-    ADMIN_API_SECRET: z.preprocess((val) => {
-      if (val === undefined || val === null || val === '') {
-        return undefined;
-      }
-      if (typeof val !== 'string') {
-        return undefined;
-      }
-      const s = val.trim();
-      return s === '' ? undefined : s;
-    }, z.string().min(1).optional()),
+    AUTH_SERVICE_AUTHORIZE_ROUTE_PATH: z
+      .string()
+      .min(1)
+      .refine((value) => !value.includes('://'), {
+        message: [
+          'AUTH_SERVICE_AUTHORIZE_ROUTE_PATH must be a path,',
+          'not an absolute URL',
+        ].join(' '),
+      })
+      .default('/api/v1/auth/authorize-route'),
+    /** Timeout (ms) da chamada de autorização ao auth-service. */
+    AUTH_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production' && !data.CORS_ORIGINS?.trim()) {
