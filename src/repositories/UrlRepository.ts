@@ -6,9 +6,16 @@ export async function findUrlByShortCode(
   options?: { withDeleted?: boolean },
 ): Promise<Url | null> {
   const repo = AppDataSource.getRepository(Url);
+  const withDeleted = options?.withDeleted === true;
   return repo.findOne({
     where: { shortCode },
-    withDeleted: options?.withDeleted === true,
+    withDeleted,
+    ...(withDeleted
+      ? {
+        /** Ativo (`deleted_at` nulo) antes de tumbas, quando ambos existem (reuso de codigo). */
+        order: { deletedAt: 'ASC' },
+      }
+      : {}),
   });
 }
 
@@ -90,11 +97,30 @@ export async function softDeleteUrlByShortCode(
   return (result.affected ?? 0) > 0;
 }
 
+/**
+ * Reativa no maximo uma linha soft-deleted: a mais recentemente excluida.
+ * Nao altera nada se ja existir URL ativa com o mesmo `short_code` (evita violar
+ * indice unico parcial e evita restaurar multiplas tumbas de uma vez).
+ */
 export async function restoreUrlByShortCode(
   shortCode: string,
 ): Promise<boolean> {
   const repo = AppDataSource.getRepository(Url);
-  const result = await repo.restore({ shortCode });
+  const active = await repo.findOne({ where: { shortCode } });
+  if (active) {
+    return false;
+  }
+  const tombstone = await repo
+    .createQueryBuilder('url')
+    .withDeleted()
+    .where('url.shortCode = :code', { code: shortCode })
+    .andWhere('url.deletedAt IS NOT NULL')
+    .orderBy('url.deletedAt', 'DESC')
+    .getOne();
+  if (!tombstone) {
+    return false;
+  }
+  const result = await repo.restore({ id: tombstone.id });
   return (result.affected ?? 0) > 0;
 }
 
