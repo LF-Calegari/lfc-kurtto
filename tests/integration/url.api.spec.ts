@@ -341,6 +341,29 @@ describe('URL API and redirect', () => {
     expect(second.body.shortCode).toBe(code);
   });
 
+  it('include_deleted GET after reuse returns active row body', async () => {
+    const code = `id${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://reuse-detail-a.example.com',
+      customCode: code,
+    });
+    await request(app).delete(`/api/v1/urls/${code}`);
+
+    const second = await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://reuse-detail-b.example.com',
+      customCode: code,
+    });
+    expect(second.status).toBe(HttpStatusCode.CREATED);
+
+    const res = await request(app)
+      .get(`/api/v1/urls/${code}?include_deleted=true`)
+      .set(adminHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    expect(res.body.shortCode).toBe(code);
+    expect(res.body.deletedAt).toBeNull();
+    expect(res.body.originalUrl).toBe('https://reuse-detail-b.example.com');
+  });
+
   it('second DELETE on same code after soft delete returns 404', async () => {
     const code = `2d${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({

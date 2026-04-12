@@ -12,8 +12,11 @@ export async function findUrlByShortCode(
     withDeleted,
     ...(withDeleted
       ? {
-        /** Ativo (`deleted_at` nulo) antes de tumbas, quando ambos existem (reuso de codigo). */
-        order: { deletedAt: 'ASC' },
+        /**
+         * PostgreSQL: `ORDER BY deleted_at DESC` coloca NULL primeiro (linha ativa),
+         * depois tumbas da mais recente à mais antiga — alinhado ao restore.
+         */
+        order: { deletedAt: 'DESC' },
       }
       : {}),
   });
