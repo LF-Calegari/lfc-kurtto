@@ -54,10 +54,11 @@ Fluxo:
 | `GET` | `/api/v1/health/ready` | Readiness: PostgreSQL acessivel; com `REDIS_URL` definido, Redis tambem deve responder (`200` ready ou `503` not_ready). |
 | `GET` | `/:code` | Redirecionamento publico para `original_url` (`302` + cache desabilitado; `404` / `410` conforme regras acima). |
 | `POST` | `/api/v1/urls` | Cria link encurtado (`201` com `short_url` a partir de `BASE_URL`; `409` se `custom_code` duplicado; `422` em validacao). |
-| `GET` | `/api/v1/urls` | Lista paginada (`page` padrao 1, `limit` padrao 10, max 100; `active` opcional `true`/`false`; meta `page`, `limit`, `total`, `total_pages`; ordenacao `created_at` DESC). |
-| `GET` | `/api/v1/urls/:code` | Detalhe por `short_code` (`200` ou `404` URL not found). |
-| `PATCH` | `/api/v1/urls/:code` | Atualizacao parcial (sem `short_code`/`clicks`; `404` se inexistente). |
-| `DELETE` | `/api/v1/urls/:code` | Remocao fisica (`204` ou `404`). |
+| `GET` | `/api/v1/urls` | Lista paginada (`page` padrao 1, `limit` padrao 10, max 100; `active` opcional `true`/`false`; `include_deleted=true` inclui soft-deleted com header `X-Admin-Secret` igual a `ADMIN_API_SECRET`; `403` se secret ausente/invalido; meta `page`, `limit`, `total`, `total_pages`; ordenacao `created_at` DESC). |
+| `GET` | `/api/v1/urls/:code` | Detalhe por `short_code` (`200` ou `404`). `include_deleted=true` + `X-Admin-Secret` retorna registro soft-deleted. Respostas incluem `deletedAt` (`null` ou ISO 8601). |
+| `PATCH` | `/api/v1/urls/:code` | Atualizacao parcial (sem `short_code`/`clicks`; `404` se inexistente ou soft-deleted). |
+| `DELETE` | `/api/v1/urls/:code` | Soft delete: preenche `deleted_at` (`204` ou `404`; segundo delete do mesmo codigo -> `404`). |
+| `POST` | `/api/v1/urls/:code/restore` | Remove soft delete (`200` + corpo URL; exige `X-Admin-Secret`; `404` codigo inexistente; `422` se nao estava soft-deleted; `403` se admin nao configurado ou secret invalido). |
 
 ## Documentacao interativa (Swagger)
 

@@ -5,7 +5,8 @@ import type { Url } from '@entities/Url';
 const repoMocks = {
   findUrlByShortCode: jest.fn(),
   updateUrlByShortCode: jest.fn(),
-  hardDeleteUrlByShortCode: jest.fn(),
+  softDeleteUrlByShortCode: jest.fn(),
+  restoreUrlByShortCode: jest.fn(),
   createUrlEntity: jest.fn(),
   saveUrl: jest.fn(),
   listUrls: jest.fn(),
@@ -149,7 +150,8 @@ describe('UrlService patch/remove cache', () => {
     jest.clearAllMocks();
     cacheMocks.delete.mockReset();
     repoMocks.updateUrlByShortCode.mockReset();
-    repoMocks.hardDeleteUrlByShortCode.mockReset();
+    repoMocks.softDeleteUrlByShortCode.mockReset();
+    repoMocks.restoreUrlByShortCode.mockReset();
   });
 
   it('patch deletes cache after update', async () => {
@@ -160,8 +162,8 @@ describe('UrlService patch/remove cache', () => {
     expect(cacheMocks.delete).toHaveBeenCalledWith('p1');
   });
 
-  it('remove deletes cache after hard delete', async () => {
-    repoMocks.hardDeleteUrlByShortCode.mockResolvedValue(true);
+  it('remove deletes cache after soft delete', async () => {
+    repoMocks.softDeleteUrlByShortCode.mockResolvedValue(true);
     const { default: urlService } = await import('@services/UrlService');
     await expect(urlService.remove('d1')).resolves.toBe(true);
     expect(cacheMocks.delete).toHaveBeenCalledWith('d1');

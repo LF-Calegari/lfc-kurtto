@@ -5,6 +5,13 @@ import { deriveIntegrationTestDatabaseUrlForWorker } from
 
 loadDotenv({ quiet: true });
 
+if (process.env.NODE_ENV === 'test') {
+  const admin = process.env.ADMIN_API_SECRET?.trim();
+  if (!admin) {
+    process.env.ADMIN_API_SECRET = 'test-admin-secret';
+  }
+}
+
 const baseKurtto = process.env.KURTTO_TEST_DATABASE_URL?.trim();
 const baseLegacy = process.env.DATABASE_URL_TEST?.trim();
 const integrationTestBaseUrl = baseKurtto || baseLegacy;

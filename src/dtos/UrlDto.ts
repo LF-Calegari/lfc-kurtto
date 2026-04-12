@@ -63,6 +63,24 @@ export const ListUrlsQuerySchema = z.object({
     .transform((val) =>
       val === undefined ? undefined : val === 'true',
     ),
+  include_deleted: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((val) =>
+      val === undefined ? undefined : val === 'true',
+    ),
 });
 
 export type ListUrlsQueryDto = z.infer<typeof ListUrlsQuerySchema>;
+
+/** Query opcional em `GET /urls/:code` para incluir registro soft-deleted (com admin). */
+export const GetUrlByCodeQuerySchema = z.object({
+  include_deleted: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((val) =>
+      val === undefined ? undefined : val === 'true',
+    ),
+});
+
+export type GetUrlByCodeQueryDto = z.infer<typeof GetUrlByCodeQuerySchema>;

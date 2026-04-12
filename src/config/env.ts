@@ -110,6 +110,21 @@ const envSchema = z
     }, z.string().min(1).optional()),
     /** TTL em segundos para entradas `url:{code}` no Redis (padrão 3600). */
     REDIS_CACHE_TTL: z.coerce.number().int().positive().default(3600),
+    /**
+     * Segredo para operações administrativas (listar URLs soft-deleted,
+     * `POST .../restore`). Envie no header `X-Admin-Secret`. Se ausente, essas
+     * operações respondem 403.
+     */
+    ADMIN_API_SECRET: z.preprocess((val) => {
+      if (val === undefined || val === null || val === '') {
+        return undefined;
+      }
+      if (typeof val !== 'string') {
+        return undefined;
+      }
+      const s = val.trim();
+      return s === '' ? undefined : s;
+    }, z.string().min(1).optional()),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production' && !data.CORS_ORIGINS?.trim()) {
