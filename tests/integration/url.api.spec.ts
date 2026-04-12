@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import request from 'supertest';
 
 import { AppDataSource } from '@config/data-source';
@@ -10,8 +11,19 @@ import { useIntegrationDatabase } from '../helpers/setup';
 
 useIntegrationDatabase();
 
-const ADMIN_SECRET = 'test-admin-secret';
-const adminHeaders = { 'X-Admin-Secret': ADMIN_SECRET };
+const authHeaders = { Authorization: 'Bearer test-token' };
+
+function mockAuthServiceResponse(status: number): void {
+  jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(new Response(null, { status }));
+}
+
+function mockAuthServiceUnavailable(): void {
+  jest
+    .spyOn(globalThis, 'fetch')
+    .mockRejectedValue(new Error('auth-service down'));
+}
 
 async function waitForClicks(
   shortCode: string,
@@ -37,6 +49,10 @@ const futureIso = (): string => {
 };
 
 describe('URL API and redirect', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('POST /api/v1/urls: generated short code (201)', async () => {
     const res = await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://example.com/generated',
@@ -189,14 +205,15 @@ describe('URL API and redirect', () => {
     expect(found).toBeUndefined();
   });
 
-  it('include_deleted list without admin header: 403', async () => {
+  it('include_deleted list without bearer token: 401', async () => {
     const res = await request(app).get(
       '/api/v1/urls?include_deleted=true',
     );
-    expect(res.status).toBe(HttpStatusCode.FORBIDDEN);
+    expect(res.status).toBe(HttpStatusCode.UNAUTHORIZED);
   });
 
-  it('include_deleted list with valid admin shows deleted rows', async () => {
+  it('include_deleted list with valid token shows deleted rows', async () => {
+    mockAuthServiceResponse(HttpStatusCode.OK);
     const code = `ad${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://admin-list.example.com',
@@ -206,7 +223,7 @@ describe('URL API and redirect', () => {
 
     const res = await request(app)
       .get('/api/v1/urls?include_deleted=true&limit=100')
-      .set(adminHeaders);
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.OK);
     const found = res.body.data.find(
       (row: { shortCode: string }) => row.shortCode === code,
@@ -215,23 +232,28 @@ describe('URL API and redirect', () => {
     expect(found.deletedAt).toBeTruthy();
   });
 
-  it('GET detail with include_deleted and admin returns row', async () => {
-    const code = `gd${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
-      originalUrl: 'https://get-deleted.example.com',
-      customCode: code,
-    });
-    await request(app).delete(`/api/v1/urls/${code}`);
+  it(
+    'GET detail with include_deleted and valid token returns row',
+    async () => {
+      mockAuthServiceResponse(HttpStatusCode.OK);
+      const code = `gd${Date.now().toString(36)}`.slice(0, 10);
+      await request(app).post('/api/v1/urls').send({
+        originalUrl: 'https://get-deleted.example.com',
+        customCode: code,
+      });
+      await request(app).delete(`/api/v1/urls/${code}`);
 
-    const res = await request(app)
-      .get(`/api/v1/urls/${code}?include_deleted=true`)
-      .set(adminHeaders);
-    expect(res.status).toBe(HttpStatusCode.OK);
-    expect(res.body.shortCode).toBe(code);
-    expect(res.body.deletedAt).toBeTruthy();
-  });
+      const res = await request(app)
+        .get(`/api/v1/urls/${code}?include_deleted=true`)
+        .set(authHeaders);
+      expect(res.status).toBe(HttpStatusCode.OK);
+      expect(res.body.shortCode).toBe(code);
+      expect(res.body.deletedAt).toBeTruthy();
+    },
+  );
 
   it('PATCH restore clears deletedAt and default GET works', async () => {
+    mockAuthServiceResponse(HttpStatusCode.OK);
     const code = `rs${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://restore.example.com',
@@ -241,7 +263,7 @@ describe('URL API and redirect', () => {
 
     const rest = await request(app)
       .patch(`/api/v1/urls/${code}/restore`)
-      .set(adminHeaders);
+      .set(authHeaders);
     expect(rest.status).toBe(HttpStatusCode.OK);
     expect(rest.body.deletedAt).toBeNull();
 
@@ -250,7 +272,7 @@ describe('URL API and redirect', () => {
     expect(getOne.body.shortCode).toBe(code);
   });
 
-  it('PATCH restore without X-Admin-Secret returns 403', async () => {
+  it('PATCH restore without bearer token returns 401', async () => {
     const code = `ra${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://restore-admin.example.com',
@@ -259,7 +281,7 @@ describe('URL API and redirect', () => {
     await request(app).delete(`/api/v1/urls/${code}`);
 
     const res = await request(app).patch(`/api/v1/urls/${code}/restore`);
-    expect(res.status).toBe(HttpStatusCode.FORBIDDEN);
+    expect(res.status).toBe(HttpStatusCode.UNAUTHORIZED);
   });
 
   it('POST /api/v1/urls/:code/restore is not supported (404)', async () => {
@@ -272,11 +294,12 @@ describe('URL API and redirect', () => {
 
     const res = await request(app)
       .post(`/api/v1/urls/${code}/restore`)
-      .set(adminHeaders);
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
   });
 
   it('PATCH restore returns 422 when URL is not soft-deleted', async () => {
+    mockAuthServiceResponse(HttpStatusCode.OK);
     const code = `nr${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://not-restore.example.com',
@@ -285,19 +308,21 @@ describe('URL API and redirect', () => {
 
     const res = await request(app)
       .patch(`/api/v1/urls/${code}/restore`)
-      .set(adminHeaders);
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
     expect(res.body.message).toBe('URL is not soft-deleted');
   });
 
   it('PATCH restore returns 404 for unknown short code', async () => {
+    mockAuthServiceResponse(HttpStatusCode.OK);
     const res = await request(app)
       .patch('/api/v1/urls/zzzzzzzzzz/restore')
-      .set(adminHeaders);
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
   });
 
   it('PATCH restore 422 when short code active after reuse', async () => {
+    mockAuthServiceResponse(HttpStatusCode.OK);
     const code = `ru${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://reuse-restore-a.example.com',
@@ -311,12 +336,13 @@ describe('URL API and redirect', () => {
 
     const res = await request(app)
       .patch(`/api/v1/urls/${code}/restore`)
-      .set(adminHeaders);
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
     expect(res.body.message).toBe('URL is not soft-deleted');
   });
 
   it('PATCH restore: two tombstones, second restore 422', async () => {
+    mockAuthServiceResponse(HttpStatusCode.OK);
     const code = `tb${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://tomb-a.example.com',
@@ -331,7 +357,7 @@ describe('URL API and redirect', () => {
 
     const rest1 = await request(app)
       .patch(`/api/v1/urls/${code}/restore`)
-      .set(adminHeaders);
+      .set(authHeaders);
     expect(rest1.status).toBe(HttpStatusCode.OK);
 
     const activeCount = await AppDataSource.getRepository(Url).count({
@@ -341,7 +367,7 @@ describe('URL API and redirect', () => {
 
     const rest2 = await request(app)
       .patch(`/api/v1/urls/${code}/restore`)
-      .set(adminHeaders);
+      .set(authHeaders);
     expect(rest2.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
     expect(rest2.body.message).toBe('URL is not soft-deleted');
 
@@ -368,6 +394,7 @@ describe('URL API and redirect', () => {
   });
 
   it('include_deleted GET after reuse returns active row body', async () => {
+    mockAuthServiceResponse(HttpStatusCode.OK);
     const code = `id${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').send({
       originalUrl: 'https://reuse-detail-a.example.com',
@@ -383,7 +410,7 @@ describe('URL API and redirect', () => {
 
     const res = await request(app)
       .get(`/api/v1/urls/${code}?include_deleted=true`)
-      .set(adminHeaders);
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.OK);
     expect(res.body.shortCode).toBe(code);
     expect(res.body.deletedAt).toBeNull();
@@ -401,12 +428,59 @@ describe('URL API and redirect', () => {
     expect(again.status).toBe(HttpStatusCode.NOT_FOUND);
   });
 
-  it('include_deleted list with wrong admin secret: 403', async () => {
+  it('include_deleted list without permission returns 403', async () => {
+    mockAuthServiceResponse(HttpStatusCode.FORBIDDEN);
     const res = await request(app)
       .get('/api/v1/urls?include_deleted=true')
-      .set({ 'X-Admin-Secret': 'wrong' });
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.FORBIDDEN);
   });
+
+  it(
+    'include_deleted envia method/path normalizados para auth-service',
+    async () => {
+      const fetchSpy = jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(null, { status: HttpStatusCode.OK }));
+
+      const code = `mp${Date.now().toString(36)}`.slice(0, 10);
+      await request(app).post('/api/v1/urls').send({
+        originalUrl: 'https://method-path.example.com',
+        customCode: code,
+      });
+
+      const res = await request(app)
+        .get(`/api/v1/urls/${code}?include_deleted=true`)
+        .set(authHeaders);
+      expect(res.status).toBe(HttpStatusCode.OK);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      const [url, init] = fetchSpy.mock.calls[0];
+      expect(String(url)).toContain('/api/v1/auth/authorize-route');
+      expect(init?.method).toBe('POST');
+      expect(init?.headers).toMatchObject({
+        Authorization: 'Bearer test-token',
+        'Content-Type': 'application/json',
+      });
+      expect(init?.body).toBe(
+        JSON.stringify({
+          method: 'GET',
+          path: '/api/v1/urls/:code',
+        }),
+      );
+    },
+  );
+
+  it(
+    'include_deleted retorna 503 quando auth-service indisponivel',
+    async () => {
+      mockAuthServiceUnavailable();
+      const res = await request(app)
+        .get('/api/v1/urls?include_deleted=true')
+        .set(authHeaders);
+      expect(res.status).toBe(HttpStatusCode.SERVICE_UNAVAILABLE);
+    },
+  );
 
   it('DELETE /api/v1/urls/:code returns 404 when missing', async () => {
     const res = await request(app).delete('/api/v1/urls/zzzzzzzzzz');

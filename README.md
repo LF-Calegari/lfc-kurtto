@@ -56,11 +56,11 @@ Fluxo:
 | `GET` | `/api/v1/health/ready` | Readiness: PostgreSQL acessivel; com `REDIS_URL` definido, Redis tambem deve responder (`200` ready ou `503` not_ready). |
 | `GET` | `/:code` | Redirecionamento publico para `original_url` (`302` + cache desabilitado; `404` / `410` conforme regras acima). |
 | `POST` | `/api/v1/urls` | Cria link encurtado (`201` com `short_url` a partir de `BASE_URL`; `409` se `custom_code` duplicado; `422` em validacao). |
-| `GET` | `/api/v1/urls` | Lista paginada (`page` padrao 1, `limit` padrao 10, max 100; `active` opcional `true`/`false`; `include_deleted=true` inclui soft-deleted com header `X-Admin-Secret` igual a `ADMIN_API_SECRET`; `403` se secret ausente/invalido; meta `page`, `limit`, `total`, `total_pages`; ordenacao `created_at` DESC). |
-| `GET` | `/api/v1/urls/:code` | Detalhe por `short_code` (`200` ou `404`). `include_deleted=true` + `X-Admin-Secret` retorna registro soft-deleted. Respostas incluem `deletedAt` (`null` ou ISO 8601). |
+| `GET` | `/api/v1/urls` | Lista paginada (`page` padrao 1, `limit` padrao 10, max 100; `active` opcional `true`/`false`; `include_deleted=true` exige `Authorization: Bearer <token>` e validação no `auth-service`; `401` para token ausente/invalido e `403` para token sem permissão; meta `page`, `limit`, `total`, `total_pages`; ordenacao `created_at` DESC). |
+| `GET` | `/api/v1/urls/:code` | Detalhe por `short_code` (`200` ou `404`). `include_deleted=true` exige `Authorization: Bearer <token>` e validação no `auth-service`; `401` para token ausente/invalido e `403` sem permissão. Respostas incluem `deletedAt` (`null` ou ISO 8601). |
 | `PATCH` | `/api/v1/urls/:code` | Atualizacao parcial (sem `short_code`/`clicks`; `404` se inexistente ou soft-deleted). |
 | `DELETE` | `/api/v1/urls/:code` | Soft delete: preenche `deleted_at` (`204` ou `404`; segundo delete do mesmo codigo -> `404`). |
-| `PATCH` | `/api/v1/urls/:code/restore` | Remove soft delete (`200` + corpo URL; exige `X-Admin-Secret`; `404` sem tumba; `422` se ja existe URL ativa com o codigo ou nao havia soft delete; restaura no maximo a tumba mais recente quando ha varias; `403` se admin invalido). |
+| `PATCH` | `/api/v1/urls/:code/restore` | Remove soft delete (`200` + corpo URL; exige `Authorization: Bearer <token>` com autorização no `auth-service`; `401` token ausente/invalido; `403` sem permissão; `404` sem tumba; `422` se ja existe URL ativa com o codigo ou nao havia soft delete; restaura no maximo a tumba mais recente quando ha varias). |
 
 ## Documentacao interativa (Swagger)
 

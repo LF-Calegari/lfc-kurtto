@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import urlController from '@controllers/UrlController';
 import { postUrlsRateLimiter } from '@middlewares/rateLimit';
+import { authorizeRoute } from '@middlewares/routeAuthorization';
 import { validateBody } from '@middlewares/validate';
 import { CreateUrlSchema, PatchUrlSchema } from '../dtos/UrlDto.js';
 
@@ -69,8 +70,10 @@ urlRouter.post(
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/UrlResponse'
+ *       401:
+ *         description: Token ausente/invalido/expirado
  *       403:
- *         description: Proibido (sem secret ou secret invalido)
+ *         description: Proibido (sem permissao na rota)
  *       404:
  *         description: Codigo inexistente
  *       422:
@@ -80,9 +83,13 @@ urlRouter.post(
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-urlRouter.patch('/:code/restore', (req, res, next) => {
-  void urlController.restore(req, res).catch(next);
-});
+urlRouter.patch(
+  '/:code/restore',
+  authorizeRoute(),
+  (req, res, next) => {
+    void urlController.restore(req, res).catch(next);
+  },
+);
 
 /**
  * @swagger
@@ -112,7 +119,7 @@ urlRouter.patch('/:code/restore', (req, res, next) => {
  *           enum: [true, false]
  *       - in: query
  *         name: include_deleted
- *         description: Inclui URLs soft-deleted (exige header X-Admin-Secret)
+ *         description: Inclui URLs soft-deleted (exige Bearer token autorizado)
  *         schema:
  *           type: string
  *           enum: [true, false]
@@ -123,8 +130,10 @@ urlRouter.patch('/:code/restore', (req, res, next) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/PaginatedResponse'
+ *       401:
+ *         description: include_deleted com token ausente/invalido
  *       403:
- *         description: include_deleted sem autorizacao admin
+ *         description: include_deleted sem permissao na rota
  *       422:
  *         description: Query invalida
  *         content:
@@ -132,9 +141,13 @@ urlRouter.patch('/:code/restore', (req, res, next) => {
  *             schema:
  *               $ref: '#/components/schemas/ValidationErrorResponse'
  */
-urlRouter.get('/', (req, res, next) => {
-  void urlController.list(req, res).catch(next);
-});
+urlRouter.get(
+  '/',
+  authorizeRoute((req) => req.query.include_deleted === 'true'),
+  (req, res, next) => {
+    void urlController.list(req, res).catch(next);
+  },
+);
 
 /**
  * @swagger
@@ -150,7 +163,7 @@ urlRouter.get('/', (req, res, next) => {
  *           type: string
  *       - in: query
  *         name: include_deleted
- *         description: Inclui registro soft-deleted (exige X-Admin-Secret)
+ *         description: Inclui registro soft-deleted (exige Bearer token autorizado)
  *         schema:
  *           type: string
  *           enum: [true, false]
@@ -161,8 +174,10 @@ urlRouter.get('/', (req, res, next) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/UrlResponse'
+ *       401:
+ *         description: include_deleted com token ausente/invalido
  *       403:
- *         description: include_deleted sem autorizacao admin
+ *         description: include_deleted sem permissao na rota
  *       404:
  *         description: Nao encontrado
  *         content:
@@ -170,9 +185,13 @@ urlRouter.get('/', (req, res, next) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-urlRouter.get('/:code', (req, res, next) => {
-  void urlController.getByCode(req, res).catch(next);
-});
+urlRouter.get(
+  '/:code',
+  authorizeRoute((req) => req.query.include_deleted === 'true'),
+  (req, res, next) => {
+    void urlController.getByCode(req, res).catch(next);
+  },
+);
 
 /**
  * @swagger
