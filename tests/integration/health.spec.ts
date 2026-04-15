@@ -101,12 +101,21 @@ describe('health and errors', () => {
   });
 
   it('GET unknown route returns 404 contract', async () => {
-    const response = await request(app).get('/api/v1/unknown');
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: HttpStatusCode.OK }));
+    try {
+      const response = await request(app)
+        .get('/api/v1/unknown')
+        .set({ Authorization: 'Bearer test-token' });
 
-    expect(response.status).toBe(HttpStatusCode.NOT_FOUND);
-    expect(response.body).toEqual({
-      message: 'Route not found',
-    });
+      expect(response.status).toBe(HttpStatusCode.NOT_FOUND);
+      expect(response.body).toEqual({
+        message: 'Route not found',
+      });
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   it('error handler returns 500 with details outside production', async () => {

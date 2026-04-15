@@ -12,6 +12,20 @@ Você coordena, passa contexto e controla o loop.
 
 ---
 
+# 🐳 Execução obrigatória em container (regra crítica)
+
+Toda ação executável do fluxo DEVE ocorrer dentro de container.
+
+- Nunca orientar execução de comandos no host.
+- Sempre instruir `programmer` e `reviewer` a rodarem comandos via `docker run` ou `docker compose run`.
+- Para comandos com bind mount do repositório, exigir `--user "$(id -u):$(id -g)"`, `-v "$PWD:/app"` e `-w /app`.
+- Se faltarem ferramentas na imagem, instalar dentro do container (ex.: `apk add --no-cache ...`), nunca no host.
+- Exceções só com instrução explícita do usuário.
+
+Se houver conflito entre instruções, esta regra prevalece para qualquer execução.
+
+---
+
 # 🎯 Objetivo
 
 Receber o número de uma issue, acionar o programmer para implementar, acionar o reviewer para revisar, e repetir o ciclo até aprovação e merge.
@@ -31,8 +45,32 @@ Aguarde a resposta antes de qualquer ação.
 # 📋 Contexto Fixo
 
 - REPO: LF-Calegari/lfc-kurtto
-- WORKSPACE: /home/calegari/Documentos/Projetos/LF Calegari Sistemas/kurtto-service
+- WORKSPACE: /home/calegari/Documentos/Projetos/LF Calegari Sistemas/Kurtto/kurtto-api
 - BASE_BRANCH: development
+
+---
+
+# 🗺️ Mapeamento de projetos (contexto multi-repo)
+
+Use este mapa como verdade de domínio quando houver citação de serviços/projetos:
+
+| Serviço | Responsabilidade | Relação com KAG | Relação com auth-service (AS) | Relação com Kurtto-Api (KA) |
+|---------|------------------|-----------------|-------------------------------|------------------------------|
+| **auth-service** | Autenticação, cadastro de sistemas, permissões e controle de acesso. Centraliza identidade e autorização. | KAG se comunica com AS **apenas no login**. | Serviço central de identidade/autorização. | KA consome AS para autenticação/autorização. |
+| **kurtto-api** | API do encurtador de links (CRUD de URLs, métricas e redirecionamentos). Depende do auth-service para autenticação/autorização. | KAG se comunica com KA para **todas as demais operações**. | Depende do AS para validar identidade/permissões. | Serviço principal de backend consumido pelo KAG. |
+| **kurtto-admin-gui (KAG)** | Painel administrativo SPA. Consome as APIs `auth-service` e `kurtto-api`. | Interface cliente (origem das chamadas). | Usa AS no fluxo de login/autenticação. | Usa KA em operações de negócio após login. |
+
+### Caminhos locais dos projetos
+
+- Auth Service: `/home/calegari/Documentos/Projetos/LF Calegari Sistemas/auth-service`
+- Kurtto API: `/home/calegari/Documentos/Projetos/LF Calegari Sistemas/Kurtto/kurtto-api`
+- Kurtto Admin GUI: `/home/calegari/Documentos/Projetos/LF Calegari Sistemas/Kurtto/kurtto-admin-gui`
+
+Regras obrigatórias de contexto:
+
+- Sempre que a issue/PR/comentário citar `auth-service`, `kurtto-api`, `kurtto-service` (alias legado) ou `kurtto-admin-gui`/`KAG`, carregar contexto do(s) projeto(s) citado(s) antes de acionar subagents.
+- Se houver impacto entre projetos, repassar explicitamente ao subagent: contrato de integração afetado, endpoint/fluxo envolvido e risco de regressão cross-repo.
+- Em caso de dúvida de nomenclatura, considerar `kurtto-service` como referência a `kurtto-api`.
 
 ---
 

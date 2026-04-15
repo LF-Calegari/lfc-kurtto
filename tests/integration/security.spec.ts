@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import request from 'supertest';
@@ -11,7 +12,19 @@ import { useIntegrationDatabase } from '../helpers/setup';
 
 useIntegrationDatabase();
 
+const authHeaders = { Authorization: 'Bearer test-token' };
+
 describe('security middleware', () => {
+  beforeEach(() => {
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: HttpStatusCode.OK }));
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('Helmet adds security headers on API responses', async () => {
     const res = await request(app).get('/api/v1/health');
 
@@ -73,7 +86,7 @@ describe('security middleware', () => {
   });
 
   it('sanitizeBody trims originalUrl before validation', async () => {
-    const res = await request(app).post('/api/v1/urls').send({
+    const res = await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: '  https://sanitize-trim.example.com/path  ',
     });
 
@@ -88,10 +101,13 @@ describe('security middleware', () => {
     async () => {
       const suffix = Date.now().toString(36).slice(-6);
       const code = `k${suffix}`;
-      const res = await request(app).post('/api/v1/urls').send({
-        originalUrl: 'https://sanitize-strip.example.com',
-        customCode: `  <b>${code}</b>  `,
-      });
+      const res = await request(app)
+        .post('/api/v1/urls')
+        .set(authHeaders)
+        .send({
+          originalUrl: 'https://sanitize-strip.example.com',
+          customCode: `  <b>${code}</b>  `,
+        });
 
       expect(res.status).toBe(HttpStatusCode.CREATED);
       expect(res.body.shortCode).toBe(code);

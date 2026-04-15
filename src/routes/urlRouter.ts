@@ -7,6 +7,14 @@ import { validateBody } from '@middlewares/validate';
 import { CreateUrlSchema, PatchUrlSchema } from '../dtos/UrlDto.js';
 
 const urlRouter = Router();
+const URL_ROUTE_CODES = {
+  CREATE: 'KURTTO_V1_URLS_POST_CREATE',
+  RESTORE: 'KURTTO_V1_URLS_PATCH_RESTORE',
+  LIST: 'KURTTO_V1_URLS_GET_LIST',
+  GET_BY_CODE: 'KURTTO_V1_URLS_GET_BY_CODE',
+  UPDATE: 'KURTTO_V1_URLS_PATCH_UPDATE',
+  DELETE: 'KURTTO_V1_URLS_DELETE_BY_CODE',
+} as const;
 
 /**
  * @swagger
@@ -44,6 +52,7 @@ const urlRouter = Router();
  */
 urlRouter.post(
   '/',
+  authorizeRoute(() => true, () => URL_ROUTE_CODES.CREATE),
   postUrlsRateLimiter,
   validateBody(CreateUrlSchema),
   (req, res, next) => {
@@ -85,7 +94,7 @@ urlRouter.post(
  */
 urlRouter.patch(
   '/:code/restore',
-  authorizeRoute(),
+  authorizeRoute(() => true, () => URL_ROUTE_CODES.RESTORE),
   (req, res, next) => {
     void urlController.restore(req, res).catch(next);
   },
@@ -131,9 +140,9 @@ urlRouter.patch(
  *             schema:
  *               $ref: '#/components/schemas/PaginatedResponse'
  *       401:
- *         description: include_deleted com token ausente/invalido
+ *         description: Token ausente/invalido
  *       403:
- *         description: include_deleted sem permissao na rota
+ *         description: Sem permissao na rota
  *       422:
  *         description: Query invalida
  *         content:
@@ -143,7 +152,7 @@ urlRouter.patch(
  */
 urlRouter.get(
   '/',
-  authorizeRoute((req) => req.query.include_deleted === 'true'),
+  authorizeRoute(() => true, () => URL_ROUTE_CODES.LIST),
   (req, res, next) => {
     void urlController.list(req, res).catch(next);
   },
@@ -175,9 +184,9 @@ urlRouter.get(
  *             schema:
  *               $ref: '#/components/schemas/UrlResponse'
  *       401:
- *         description: include_deleted com token ausente/invalido
+ *         description: Token ausente/invalido
  *       403:
- *         description: include_deleted sem permissao na rota
+ *         description: Sem permissao na rota
  *       404:
  *         description: Nao encontrado
  *         content:
@@ -187,7 +196,7 @@ urlRouter.get(
  */
 urlRouter.get(
   '/:code',
-  authorizeRoute((req) => req.query.include_deleted === 'true'),
+  authorizeRoute(() => true, () => URL_ROUTE_CODES.GET_BY_CODE),
   (req, res, next) => {
     void urlController.getByCode(req, res).catch(next);
   },
@@ -233,6 +242,7 @@ urlRouter.get(
  */
 urlRouter.patch(
   '/:code',
+  authorizeRoute(() => true, () => URL_ROUTE_CODES.UPDATE),
   validateBody(PatchUrlSchema),
   (req, res, next) => {
     void urlController.patch(req, res).catch(next);
@@ -261,8 +271,12 @@ urlRouter.patch(
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-urlRouter.delete('/:code', (req, res, next) => {
-  void urlController.remove(req, res).catch(next);
-});
+urlRouter.delete(
+  '/:code',
+  authorizeRoute(() => true, () => URL_ROUTE_CODES.DELETE),
+  (req, res, next) => {
+    void urlController.remove(req, res).catch(next);
+  },
+);
 
 export default urlRouter;
