@@ -1,7 +1,6 @@
 import express, { Express, Router } from 'express';
 
 import redirectController from '@controllers/RedirectController';
-import { redirectRateLimiter } from '@middlewares/rateLimit';
 import { sanitizeBody } from '@middlewares/sanitize';
 import healthRouter from '@routes/healthRouter';
 import urlRouter from '@routes/urlRouter';
@@ -14,7 +13,6 @@ const routes = (app: Express): void => {
   apiRouter.use('/urls', urlRouter);
 
   app.use('/api/v1', apiRouter);
-
   /**
    * @swagger
    * /{code}:
@@ -46,7 +44,7 @@ const routes = (app: Express): void => {
    *             schema:
    *               $ref: '#/components/schemas/ErrorResponse'
    */
-  app.get('/:code', redirectRateLimiter, (req, res, next) => {
+  app.get('/:code', (req, res, next) => {
     void redirectController.handle(req, res).catch(next);
   });
 };

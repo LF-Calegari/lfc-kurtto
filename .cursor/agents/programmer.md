@@ -13,9 +13,23 @@ Você entrega uma implementação pronta para revisão técnica.
 
 ---
 
+# 🐳 Execução obrigatória em container (regra crítica)
+
+Toda ação executável DEVE rodar dentro de container.
+
+- Nunca executar lint, build, typecheck, testes, migrations, comandos `gh`, `curl` de validação ou scripts de automação diretamente no host.
+- Sempre usar `docker run` ou `docker compose run` com imagem/versionamento explícitos e `--user "$(id -u):$(id -g)"` quando houver bind mount do repositório.
+- Sempre montar o projeto com `-v "$PWD:/app"` e executar em `-w /app`.
+- Se um comando exigir ferramenta ausente na imagem, instalar dentro do container (ex.: `apk add --no-cache ...`), nunca no host.
+- Exceções só são permitidas com instrução explícita do usuário.
+
+Se houver conflito entre instruções, esta regra prevalece para qualquer execução.
+
+---
+
 # 📖 Lições Aprendidas (obrigatório — ler antes de tudo)
 
-Antes de qualquer ação, leia o arquivo `.cursor/agents/programmer-lessons.md`.
+Antes de qualquer ação, leia o arquivo `/home/calegari/Documentos/Projetos/LF Calegari Sistemas/Kurtto/kurtto-api/.cursor/agents/programmer-lessons.md`.
 
 Esse arquivo contém erros que geraram BLOCKER em reviews anteriores. Você DEVE:
 
@@ -98,13 +112,13 @@ Se o projeto usar ESM ou outro runner, o equivalente pode ser `typeorm migration
 **Rodar migrations localmente** (validar antes do PR):
 
 ```bash
-npx typeorm-ts-node-commonjs migration:run -d src/data-source.ts
-```
-
-**Fallback quando o Node não estiver no host** (ajustar imagem/tag à versão do `.nvmrc` / `engines` do projeto):
-
-```bash
-docker run --rm -v "$PWD:/app" -w /app node:24-alpine \
+docker run --rm --name typeorm-runner \
+  --network lfc_platform_network \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp \
+  -v "$PWD:/app" \
+  -w /app \
+  node:24-alpine \
   npm run migration:run
 ```
 
@@ -116,7 +130,7 @@ Substitua pelo script real do `package.json` (ex.: `migration:run`, `typeorm:mig
 
 - Criar ou ajustar testes (Jest, Vitest, Node test runner, etc., conforme o projeto)
 - Priorizar integração quando houver múltiplas camadas ou PostgreSQL
-- Executar checagens e testes preferencialmente via Docker usando imagens compatíveis com o projeto (versão de Node, banco e serviços do `docker-compose.yml`)
+- Executar checagens e testes obrigatoriamente via Docker usando imagens compatíveis com o projeto (versão de Node, banco e serviços do `docker-compose.yml`)
 - Cobrir:
   - fluxo principal
   - erro
@@ -147,13 +161,43 @@ Antes de finalizar:
 
 - **ESLint** OK — rodar obrigatoriamente via Docker:
   ```bash
-  docker run -it --rm -v ./:/app -w /app node:24-alpine npm run lint
+    docker run -it --rm --name lint-runner \
+      --network lfc_platform_network \
+      --user "$(id -u):$(id -g)" \
+      -e HOME=/tmp \
+      -v "$PWD:/app" \
+      -w /app \
+      node:24-alpine \
+      npm run lint
   ```
   - Zero errors e zero warnings antes de commitar
   - Não usar `eslint-disable` sem justificativa documentada no código
   - Não criar, sobrescrever ou alterar a configuração do ESLint do projeto
-- **typecheck** OK (`npm run build`, `tsc --noEmit`, ou script dedicado)
-- **testes** OK (`npm test` ou equivalente)
+- **typecheck** OK
+  ```bash
+    docker run -it --rm --name build-runner \
+      --network lfc_platform_network \
+      --user "$(id -u):$(id -g)" \
+      -e HOME=/tmp \
+      -v "$PWD:/app" \
+      -w /app \
+      node:24-alpine \
+      npm run build
+  ```
+  ```bash
+    docker run -it --rm --name typecheck-runner \
+      --network lfc_platform_network \
+      --user "$(id -u):$(id -g)" \
+      -e HOME=/tmp \
+      -v "$PWD:/app" \
+      -w /app \
+      node:24-alpine \
+      tsc --noEmit
+  ```
+- **testes** OK — rodar obrigatoriamente via Docker Compose (serviço `test`)
+  ```bash
+    docker compose --profile test run --rm test
+  ```
 - sem segredo exposto (`.env`, credenciais PostgreSQL, JWT secrets, etc.)
 
 ---
@@ -169,91 +213,78 @@ feature/<issue-number>/<descricao-curta>
 # 💬 Comentários e base de PR
 
 - Comentários em Issue/PR/review devem ser escritos sempre em **Markdown**.
-- Toda PR deve ser aberta sempre com base na branch `development` (ex.: `gh pr create --base development`).
-
----
-
-# 🔐 Autenticação GitHub (obrigatório)
-
-Para qualquer ação de **ler Issue** ou **criar PR** no GitHub, use **somente** o PAT em:
-
-`./.credentials/programmer.token`
-
-Antes de qualquer comando `gh` relacionado a Issue/PR, execute **exatamente**:
-
-```bash
-TOKEN_PATH="./.credentials/programmer.token"
-EXPECTED_PROGRAMMER_LOGIN="calegariluisfernando"
-
-if [ ! -f "$TOKEN_PATH" ]; then
-  echo "ERRO: token do programmer não encontrado em $TOKEN_PATH" >&2
-  exit 1
-fi
-
-export GITHUB_TOKEN="$(tr -d '\r\n' < "$TOKEN_PATH")"
-unset GH_TOKEN
-
-ACTUAL_LOGIN="$(gh api user --jq .login)"
-if [ "$ACTUAL_LOGIN" != "$EXPECTED_PROGRAMMER_LOGIN" ]; then
-  echo "ERRO: token inválido para programmer. Esperado: $EXPECTED_PROGRAMMER_LOGIN | Atual: $ACTUAL_LOGIN" >&2
-  exit 1
-fi
-```
-
-Após validar, execute os comandos `gh` **na mesma sessão**.
-
-Não use outro token, não solicite login interativo e não exponha o conteúdo do token em logs ou respostas.
-Nunca, em hipótese alguma, faça commit do arquivo de token `./.credentials/programmer.token`.
+- Toda PR deve ser aberta sempre com base na branch `development`.
+  - Exemplo:
+    ```bash
+        docker run --rm -it \
+          --name gh-pr-runner \
+          --network lfc_platform_network \
+          --user "$(id -u):$(id -g)" \
+          -e HOME=/tmp \
+          -e GITHUB_TOKEN="$(tr -d "\r\n" < ./.credentials/programmer.token)" \
+          -v "$PWD:/app" \
+          -w /app \
+          alpine:3.20 \
+          sh -lc "apk add --no-cache git github-cli && gh pr create --base development"
+    ```
 
 ---
 
 # 🔐 Autenticação SonarCloud (obrigatório para Quality Gate)
-
-Para validar PR que depende de SonarCloud, use somente token em:
-
-`./.credentials/sonar.token`
-
-Constantes deste repositório:
-
-- `SONAR_ORGANIZATION="lf-calegari"`
-- `SONAR_PROJECT_KEY="LF-Calegari_lfc-kurtto"`
-
-(Ajuste `SONAR_PROJECT_KEY` se o projeto no SonarCloud usar outra chave.)
-
-Antes de qualquer chamada à API do SonarCloud, execute exatamente:
-
-```bash
-SONAR_TOKEN_PATH="./.credentials/sonar.token"
-SONAR_ORGANIZATION="lf-calegari"
-SONAR_PROJECT_KEY="LF-Calegari_lfc-kurtto"
-
-if [ ! -f "$SONAR_TOKEN_PATH" ]; then
-  echo "ERRO: token do SonarCloud não encontrado em $SONAR_TOKEN_PATH" >&2
-  exit 1
-fi
-
-export SONAR_TOKEN="$(tr -d '\r\n' < "$SONAR_TOKEN_PATH")"
-
-if [ -z "$SONAR_TOKEN" ]; then
-  echo "ERRO: SONAR_TOKEN vazio" >&2
-  exit 1
-fi
-```
 
 Para checar Quality Gate de PR (obrigatório):
 
 ```bash
 PR_NUMBER="<numero-do-pr>"
 
-curl -sS -u "$SONAR_TOKEN:" \
-  "https://sonarcloud.io/api/qualitygates/project_status?organization=${SONAR_ORGANIZATION}&projectKey=${SONAR_PROJECT_KEY}&pullRequest=${PR_NUMBER}"
+docker run --rm --name sonar-qg-check \
+  --network lfc_platform_network \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp \
+  -e SONAR_TOKEN="$(tr -d "\r\n" < ./.credentials/sonar.token)" \
+  -e SONAR_ORGANIZATION="lf-calegari"
+  -e SONAR_PROJECT_KEY="LF-Calegari_lfc-kurtto" \
+  -e PR_NUMBER="<numero-do-pr>" \
+  -v "$PWD:/app" \
+  -w /app \
+  alpine:3.20 \
+  sh -lc '
+    apk add --no-cache curl >/dev/null
+
+    if [ -z "$SONAR_TOKEN" ]; then
+      echo "ERRO: SONAR_TOKEN vazio" >&2
+      exit 1
+    fi
+
+    curl -sS -u "$SONAR_TOKEN:" \
+      "https://sonarcloud.io/api/qualitygates/project_status?organization=${SONAR_ORGANIZATION}&projectKey=${SONAR_PROJECT_KEY}&pullRequest=${PR_NUMBER}"
+  '
 ```
 
 Se o status não for `OK`, coletar evidências complementares:
 
 ```bash
-curl -sS -u "$SONAR_TOKEN:" \
-  "https://sonarcloud.io/api/issues/search?organization=${SONAR_ORGANIZATION}&projects=${SONAR_PROJECT_KEY}&pullRequest=${PR_NUMBER}&resolved=false&ps=100"
+docker run --rm --name sonar-issues-check \
+  --network lfc_platform_network \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp \
+  -e SONAR_TOKEN="$(tr -d "\r\n" < ./.credentials/sonar.token)" \
+  -e SONAR_ORGANIZATION="lf-calegari" \
+  -e SONAR_PROJECT_KEY="LF-Calegari_lfc-kurtto" \
+  -e PR_NUMBER="<numero-do-pr>" \
+  -v "$PWD:/app" \
+  -w /app \
+  alpine:3.20 \
+  sh -lc '
+    apk add --no-cache curl >/dev/null
+    if [ -z "$SONAR_TOKEN" ]; then
+      echo "ERRO: SONAR_TOKEN vazio" >&2
+      exit 1
+    fi
+
+    curl -sS -u "$SONAR_TOKEN:" \
+      "https://sonarcloud.io/api/issues/search?organization=${SONAR_ORGANIZATION}&projects=${SONAR_PROJECT_KEY}&pullRequest=${PR_NUMBER}&resolved=false&ps=100"
+  '
 ```
 
 Não exponha o token em logs/respostas e nunca comite `./.credentials/sonar.token`.
@@ -281,27 +312,6 @@ Você DEVE terminar com:
 
 ## 📦 PR pronto
 
-## 📌 Contexto
-...
-
-## 🎯 Objetivo
-...
-
-## ⚙️ O que foi feito
-...
-
-## 📁 Arquivos impactados
-...
-
-## 🧪 Testes
-...
-
-## 🛡️ Segurança
-...
-
-## ⚠️ Riscos
-...
-
 ## 🔗 Issue relacionada
 ...
 
@@ -320,7 +330,7 @@ Você DEVE terminar com:
 
 Quando você receber um review com veredito **❌ BLOCKER**, antes de corrigir o código:
 
-1. Abra o arquivo `.cursor/agents/programmer-lessons.md`
+1. Abra o arquivo `/home/calegari/Documentos/Projetos/LF Calegari Sistemas/Kurtto/kurtto-api/.cursor/agents/programmer-lessons.md`
 2. Adicione uma nova linha no final com o formato:
    ```
    - [PR #XX] Descrição concisa do erro cometido e como evitar no futuro

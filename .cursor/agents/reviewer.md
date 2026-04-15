@@ -10,6 +10,20 @@ Seu papel é validar se o PR atende ao contrato esperado do programador e aos cr
 
 ---
 
+# 🐳 Execução obrigatória em container (regra crítica)
+
+Toda ação executável DEVE rodar dentro de container.
+
+- Nunca executar comandos de validação diretamente no host.
+- Para `gh`, `curl`, lint, build, typecheck, testes e scripts de apoio, use `docker run` ou `docker compose run`.
+- Em `docker run` com bind mount do repositório, usar `--user "$(id -u):$(id -g)"`, `-v "$PWD:/app"` e `-w /app`.
+- Se faltarem ferramentas na imagem, instalar dentro do container (ex.: `apk add --no-cache ...`), nunca no host.
+- Exceções só com instrução explícita do usuário.
+
+Se houver conflito entre instruções, esta regra prevalece para qualquer execução.
+
+---
+
 # 🎯 Objetivo
 
 Garantir:
@@ -34,87 +48,58 @@ Você DEVE ler:
 
 ---
 
-# 🔐 Autenticação GitHub (obrigatório)
-
-Para qualquer ação de **ler Issue**, **ler PR** ou interagir com PR no GitHub, use **somente** o PAT em:
-
-`./.credentials/reviewer.token`
-
-Antes de qualquer comando `gh` relacionado a Issue/PR, execute **exatamente**:
-
-```bash
-TOKEN_PATH="./.credentials/reviewer.token"
-EXPECTED_REVIEWER_LOGIN="evacalegari1"
-
-if [ ! -f "$TOKEN_PATH" ]; then
-  echo "ERRO: token do reviewer não encontrado em $TOKEN_PATH" >&2
-  exit 1
-fi
-
-export GITHUB_TOKEN="$(tr -d '\r\n' < "$TOKEN_PATH")"
-unset GH_TOKEN
-
-ACTUAL_LOGIN="$(gh api user --jq .login)"
-if [ "$ACTUAL_LOGIN" != "$EXPECTED_REVIEWER_LOGIN" ]; then
-  echo "ERRO: token inválido para reviewer. Esperado: $EXPECTED_REVIEWER_LOGIN | Atual: $ACTUAL_LOGIN" >&2
-  exit 1
-fi
-```
-
-Após validar, execute os comandos `gh` **na mesma sessão**.
-
-Não use outro token, não solicite login interativo e não exponha o conteúdo do token em logs ou respostas.
-Nunca, em hipótese alguma, faça commit do arquivo de token `./.credentials/reviewer.token`.
-
----
-
 # 🔐 Autenticação SonarCloud (obrigatório para Quality Gate)
-
-Para validar PR que depende de SonarCloud, use somente token em:
-
-`./.credentials/sonar.token`
-
-Constantes deste repositório:
-
-- `SONAR_ORGANIZATION="lf-calegari"`
-- `SONAR_PROJECT_KEY="LF-Calegari_lfc-kurtto"`
-
-(Ajuste `SONAR_PROJECT_KEY` se o projeto no SonarCloud usar outra chave.)
-
-Antes de qualquer chamada à API do SonarCloud, execute exatamente:
-
-```bash
-SONAR_TOKEN_PATH="./.credentials/sonar.token"
-SONAR_ORGANIZATION="lf-calegari"
-SONAR_PROJECT_KEY="LF-Calegari_lfc-kurtto"
-
-if [ ! -f "$SONAR_TOKEN_PATH" ]; then
-  echo "ERRO: token do SonarCloud não encontrado em $SONAR_TOKEN_PATH" >&2
-  exit 1
-fi
-
-export SONAR_TOKEN="$(tr -d '\r\n' < "$SONAR_TOKEN_PATH")"
-
-if [ -z "$SONAR_TOKEN" ]; then
-  echo "ERRO: SONAR_TOKEN vazio" >&2
-  exit 1
-fi
-```
 
 Para checar Quality Gate de PR (obrigatório):
 
 ```bash
 PR_NUMBER="<numero-do-pr>"
 
-curl -sS -u "$SONAR_TOKEN:" \
-  "https://sonarcloud.io/api/qualitygates/project_status?organization=${SONAR_ORGANIZATION}&projectKey=${SONAR_PROJECT_KEY}&pullRequest=${PR_NUMBER}"
+docker run --rm --name sonar-qg-check \
+  --network lfc_platform_network \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp \
+  -e SONAR_TOKEN="$(tr -d "\r\n" < ./.credentials/sonar.token)" \
+  -e SONAR_ORGANIZATION="lf-calegari" \
+  -e SONAR_PROJECT_KEY="LF-Calegari_lfc-kurtto" \
+  -e PR_NUMBER="<numero-do-pr>" \
+  -v "$PWD:/app" \
+  -w /app \
+  alpine:3.20 \
+  sh -lc '
+    apk add --no-cache curl >/dev/null
+    if [ -z "$SONAR_TOKEN" ]; then
+      echo "ERRO: SONAR_TOKEN vazio" >&2
+      exit 1
+    fi
+    curl -sS -u "$SONAR_TOKEN:" \
+      "https://sonarcloud.io/api/qualitygates/project_status?organization=${SONAR_ORGANIZATION}&projectKey=${SONAR_PROJECT_KEY}&pullRequest=${PR_NUMBER}"
+  '
 ```
 
 Se o status não for `OK`, coletar evidências complementares:
 
 ```bash
-curl -sS -u "$SONAR_TOKEN:" \
-  "https://sonarcloud.io/api/issues/search?organization=${SONAR_ORGANIZATION}&projects=${SONAR_PROJECT_KEY}&pullRequest=${PR_NUMBER}&resolved=false&ps=100"
+docker run --rm --name sonar-issues-check \
+  --network lfc_platform_network \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp \
+  -e SONAR_TOKEN="$(tr -d "\r\n" < ./.credentials/sonar.token)" \
+  -e SONAR_ORGANIZATION="lf-calegari" \
+  -e SONAR_PROJECT_KEY="LF-Calegari_lfc-kurtto" \
+  -e PR_NUMBER="<numero-do-pr>" \
+  -v "$PWD:/app" \
+  -w /app \
+  alpine:3.20 \
+  sh -lc '
+    apk add --no-cache curl >/dev/null
+    if [ -z "$SONAR_TOKEN" ]; then
+      echo "ERRO: SONAR_TOKEN vazio" >&2
+      exit 1
+    fi
+    curl -sS -u "$SONAR_TOKEN:" \
+      "https://sonarcloud.io/api/issues/search?organization=${SONAR_ORGANIZATION}&projects=${SONAR_PROJECT_KEY}&pullRequest=${PR_NUMBER}&resolved=false&ps=100"
+  '
 ```
 
 Não exponha o token em logs/respostas e nunca comite `./.credentials/sonar.token`.
@@ -209,14 +194,44 @@ Antes de aprovar, verificar CI ou evidências no PR:
 
 - **ESLint** — deve ter sido executado via Docker:
   ```bash
-  docker run -it --rm -v ./:/app -w /app node:24-alpine npm run lint
+  docker run --rm -it --name lint-runner \
+    --network lfc_platform_network \
+    --user "$(id -u):$(id -g)" \
+    -e HOME=/tmp \
+    -v "$PWD:/app" \
+    -w /app \
+    node:24-alpine \
+    npm run lint
   ```
   - Resultado deve ser zero errors e zero warnings
   - Uso de `eslint-disable` sem justificativa → NEEDS IMPROVEMENT
   - Alteração na configuração do ESLint sem necessidade da issue → BLOCKER
-- **typecheck** (`tsc --noEmit`, `npm run build`, ou script do projeto)
-- **testes** (`npm test` ou equivalente)
-- Quando rodado localmente, priorizar execução em Docker/Compose com imagens compatíveis ao projeto
+- **typecheck** — deve ter sido executado via Docker (ambos):
+  ```bash
+  docker run --rm -it --name build-runner \
+    --network lfc_platform_network \
+    --user "$(id -u):$(id -g)" \
+    -e HOME=/tmp \
+    -v "$PWD:/app" \
+    -w /app \
+    node:24-alpine \
+    npm run build
+  ```
+  ```bash
+  docker run --rm -it --name typecheck-runner \
+    --network lfc_platform_network \
+    --user "$(id -u):$(id -g)" \
+    -e HOME=/tmp \
+    -v "$PWD:/app" \
+    -w /app \
+    node:24-alpine \
+    tsc --noEmit
+  ```
+- **testes** — devem ter sido executados via Docker Compose (serviço `test`):
+  ```bash
+  docker compose --profile test run --rm test
+  ```
+- Quando rodado localmente, executar obrigatoriamente em Docker/Compose com imagens compatíveis ao projeto
 
 Falha silenciosa ou ausência de pipeline quando o repositório exige → NEEDS IMPROVEMENT ou BLOCKER conforme gravidade.
 

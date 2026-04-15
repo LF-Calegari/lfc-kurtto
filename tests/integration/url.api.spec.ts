@@ -30,7 +30,9 @@ async function waitForClicks(
   minClicks: number,
 ): Promise<void> {
   for (let i = 0; i < 50; i++) {
-    const res = await request(app).get(`/api/v1/urls/${shortCode}`);
+    const res = await request(app)
+      .get(`/api/v1/urls/${shortCode}`)
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.OK);
     if (res.body.clicks >= minClicks) {
       return;
@@ -49,12 +51,16 @@ const futureIso = (): string => {
 };
 
 describe('URL API and redirect', () => {
+  beforeEach(() => {
+    mockAuthServiceResponse(HttpStatusCode.OK);
+  });
+
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
   it('POST /api/v1/urls: generated short code (201)', async () => {
-    const res = await request(app).post('/api/v1/urls').send({
+    const res = await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://example.com/generated',
     });
 
@@ -68,36 +74,47 @@ describe('URL API and redirect', () => {
 
   it('POST /api/v1/urls: custom code 201 and GET by code', async () => {
     const code = `c${Date.now().toString(36)}`.slice(0, 10);
-    const create = await request(app).post('/api/v1/urls').send({
-      originalUrl: 'https://example.com/custom',
-      customCode: code,
-    });
+    const create = await request(app)
+      .post('/api/v1/urls')
+      .set(authHeaders)
+      .send({
+        originalUrl: 'https://example.com/custom',
+        customCode: code,
+      });
     expect(create.status).toBe(HttpStatusCode.CREATED);
     expect(create.body.shortCode).toBe(code);
 
-    const getOne = await request(app).get(`/api/v1/urls/${code}`);
+    const getOne = await request(app)
+      .get(`/api/v1/urls/${code}`)
+      .set(authHeaders);
     expect(getOne.status).toBe(HttpStatusCode.OK);
     expect(getOne.body.shortCode).toBe(code);
   });
 
   it('POST /api/v1/urls returns 409 for duplicate custom code', async () => {
     const code = `d${Date.now().toString(36)}`.slice(0, 10);
-    const first = await request(app).post('/api/v1/urls').send({
-      originalUrl: 'https://example.com/a',
-      customCode: code,
-    });
+    const first = await request(app)
+      .post('/api/v1/urls')
+      .set(authHeaders)
+      .send({
+        originalUrl: 'https://example.com/a',
+        customCode: code,
+      });
     expect(first.status).toBe(HttpStatusCode.CREATED);
 
-    const second = await request(app).post('/api/v1/urls').send({
-      originalUrl: 'https://example.com/b',
-      customCode: code,
-    });
+    const second = await request(app)
+      .post('/api/v1/urls')
+      .set(authHeaders)
+      .send({
+        originalUrl: 'https://example.com/b',
+        customCode: code,
+      });
     expect(second.status).toBe(HttpStatusCode.CONFLICT);
     expect(second.body.message).toBe('custom_code already exists');
   });
 
   it('POST /api/v1/urls returns 422 for invalid body', async () => {
-    const res = await request(app).post('/api/v1/urls').send({
+    const res = await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'not-a-url',
     });
     expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
@@ -106,7 +123,7 @@ describe('URL API and redirect', () => {
   });
 
   it('POST /api/v1/urls returns 422 when expiresAt is past', async () => {
-    const res = await request(app).post('/api/v1/urls').send({
+    const res = await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://example.com/exp',
       expiresAt: '2000-01-01T00:00:00.000Z',
     });
@@ -117,7 +134,9 @@ describe('URL API and redirect', () => {
   });
 
   it('GET /api/v1/urls returns paginated list with meta', async () => {
-    const res = await request(app).get('/api/v1/urls?page=1&limit=5');
+    const res = await request(app)
+      .get('/api/v1/urls?page=1&limit=5')
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.OK);
     expect(Array.isArray(res.body.data)).toBe(true);
     expect(res.body.meta.page).toBe(1);
@@ -128,13 +147,18 @@ describe('URL API and redirect', () => {
 
   it('GET /api/v1/urls?active=false filters inactive rows', async () => {
     const code = `e${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://inactive.example.com',
       customCode: code,
     });
-    await request(app).patch(`/api/v1/urls/${code}`).send({ isActive: false });
+    await request(app)
+      .patch(`/api/v1/urls/${code}`)
+      .set(authHeaders)
+      .send({ isActive: false });
 
-    const res = await request(app).get('/api/v1/urls?active=false&limit=100');
+    const res = await request(app)
+      .get('/api/v1/urls?active=false&limit=100')
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.OK);
     const found = res.body.data.find(
       (row: { shortCode: string }) => row.shortCode === code,
@@ -143,21 +167,26 @@ describe('URL API and redirect', () => {
   });
 
   it('GET /api/v1/urls/:code returns 404 when missing', async () => {
-    const res = await request(app).get('/api/v1/urls/zzzzzzzzzz');
+    const res = await request(app)
+      .get('/api/v1/urls/zzzzzzzzzz')
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
     expect(res.body.message).toBe('URL not found');
   });
 
   it('PATCH /api/v1/urls/:code applies partial update', async () => {
     const code = `f${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://patch.example.com',
       customCode: code,
     });
 
-    const res = await request(app).patch(`/api/v1/urls/${code}`).send({
-      originalUrl: 'https://patched.example.com',
-    });
+    const res = await request(app)
+      .patch(`/api/v1/urls/${code}`)
+      .set(authHeaders)
+      .send({
+        originalUrl: 'https://patched.example.com',
+      });
     expect(res.status).toBe(HttpStatusCode.OK);
     expect(res.body.originalUrl).toBe('https://patched.example.com');
   });
@@ -165,18 +194,21 @@ describe('URL API and redirect', () => {
   it('PATCH /api/v1/urls/:code returns 404 when not found', async () => {
     const res = await request(app)
       .patch('/api/v1/urls/zzzzzzzzzz')
+      .set(authHeaders)
       .send({ isActive: true });
     expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
   });
 
   it('DELETE soft delete: 204, row has deletedAt, GET detail 404', async () => {
     const code = `g${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://delete.example.com',
       customCode: code,
     });
 
-    const del = await request(app).delete(`/api/v1/urls/${code}`);
+    const del = await request(app)
+      .delete(`/api/v1/urls/${code}`)
+      .set(authHeaders);
     expect(del.status).toBe(HttpStatusCode.NO_CONTENT);
 
     const row = await AppDataSource.getRepository(Url).findOne({
@@ -185,19 +217,23 @@ describe('URL API and redirect', () => {
     });
     expect(row?.deletedAt).toBeTruthy();
 
-    const getOne = await request(app).get(`/api/v1/urls/${code}`);
+    const getOne = await request(app)
+      .get(`/api/v1/urls/${code}`)
+      .set(authHeaders);
     expect(getOne.status).toBe(HttpStatusCode.NOT_FOUND);
   });
 
   it('default list omits soft-deleted rows', async () => {
     const code = `sd${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://soft-list.example.com',
       customCode: code,
     });
-    await request(app).delete(`/api/v1/urls/${code}`);
+    await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
 
-    const res = await request(app).get('/api/v1/urls?limit=100');
+    const res = await request(app)
+      .get('/api/v1/urls?limit=100')
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.OK);
     const found = res.body.data.find(
       (row: { shortCode: string }) => row.shortCode === code,
@@ -213,13 +249,12 @@ describe('URL API and redirect', () => {
   });
 
   it('include_deleted list with valid token shows deleted rows', async () => {
-    mockAuthServiceResponse(HttpStatusCode.OK);
     const code = `ad${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://admin-list.example.com',
       customCode: code,
     });
-    await request(app).delete(`/api/v1/urls/${code}`);
+    await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
 
     const res = await request(app)
       .get('/api/v1/urls?include_deleted=true&limit=100')
@@ -235,13 +270,12 @@ describe('URL API and redirect', () => {
   it(
     'GET detail with include_deleted and valid token returns row',
     async () => {
-      mockAuthServiceResponse(HttpStatusCode.OK);
       const code = `gd${Date.now().toString(36)}`.slice(0, 10);
-      await request(app).post('/api/v1/urls').send({
+      await request(app).post('/api/v1/urls').set(authHeaders).send({
         originalUrl: 'https://get-deleted.example.com',
         customCode: code,
       });
-      await request(app).delete(`/api/v1/urls/${code}`);
+      await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
 
       const res = await request(app)
         .get(`/api/v1/urls/${code}?include_deleted=true`)
@@ -253,13 +287,12 @@ describe('URL API and redirect', () => {
   );
 
   it('PATCH restore clears deletedAt and default GET works', async () => {
-    mockAuthServiceResponse(HttpStatusCode.OK);
     const code = `rs${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://restore.example.com',
       customCode: code,
     });
-    await request(app).delete(`/api/v1/urls/${code}`);
+    await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
 
     const rest = await request(app)
       .patch(`/api/v1/urls/${code}/restore`)
@@ -267,18 +300,20 @@ describe('URL API and redirect', () => {
     expect(rest.status).toBe(HttpStatusCode.OK);
     expect(rest.body.deletedAt).toBeNull();
 
-    const getOne = await request(app).get(`/api/v1/urls/${code}`);
+    const getOne = await request(app)
+      .get(`/api/v1/urls/${code}`)
+      .set(authHeaders);
     expect(getOne.status).toBe(HttpStatusCode.OK);
     expect(getOne.body.shortCode).toBe(code);
   });
 
   it('PATCH restore without bearer token returns 401', async () => {
     const code = `ra${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://restore-admin.example.com',
       customCode: code,
     });
-    await request(app).delete(`/api/v1/urls/${code}`);
+    await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
 
     const res = await request(app).patch(`/api/v1/urls/${code}/restore`);
     expect(res.status).toBe(HttpStatusCode.UNAUTHORIZED);
@@ -286,11 +321,11 @@ describe('URL API and redirect', () => {
 
   it('POST /api/v1/urls/:code/restore is not supported (404)', async () => {
     const code = `np${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://legacy-post-restore.example.com',
       customCode: code,
     });
-    await request(app).delete(`/api/v1/urls/${code}`);
+    await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
 
     const res = await request(app)
       .post(`/api/v1/urls/${code}/restore`)
@@ -299,9 +334,8 @@ describe('URL API and redirect', () => {
   });
 
   it('PATCH restore returns 422 when URL is not soft-deleted', async () => {
-    mockAuthServiceResponse(HttpStatusCode.OK);
     const code = `nr${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://not-restore.example.com',
       customCode: code,
     });
@@ -314,7 +348,6 @@ describe('URL API and redirect', () => {
   });
 
   it('PATCH restore returns 404 for unknown short code', async () => {
-    mockAuthServiceResponse(HttpStatusCode.OK);
     const res = await request(app)
       .patch('/api/v1/urls/zzzzzzzzzz/restore')
       .set(authHeaders);
@@ -322,14 +355,13 @@ describe('URL API and redirect', () => {
   });
 
   it('PATCH restore 422 when short code active after reuse', async () => {
-    mockAuthServiceResponse(HttpStatusCode.OK);
     const code = `ru${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://reuse-restore-a.example.com',
       customCode: code,
     });
-    await request(app).delete(`/api/v1/urls/${code}`);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://reuse-restore-b.example.com',
       customCode: code,
     });
@@ -342,18 +374,17 @@ describe('URL API and redirect', () => {
   });
 
   it('PATCH restore: two tombstones, second restore 422', async () => {
-    mockAuthServiceResponse(HttpStatusCode.OK);
     const code = `tb${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://tomb-a.example.com',
       customCode: code,
     });
-    await request(app).delete(`/api/v1/urls/${code}`);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://tomb-b.example.com',
       customCode: code,
     });
-    await request(app).delete(`/api/v1/urls/${code}`);
+    await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
 
     const rest1 = await request(app)
       .patch(`/api/v1/urls/${code}/restore`)
@@ -379,33 +410,38 @@ describe('URL API and redirect', () => {
 
   it('POST same custom_code after soft delete on prior row: 201', async () => {
     const code = `rc${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://reuse-a.example.com',
       customCode: code,
     });
-    await request(app).delete(`/api/v1/urls/${code}`);
+    await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
 
-    const second = await request(app).post('/api/v1/urls').send({
-      originalUrl: 'https://reuse-b.example.com',
-      customCode: code,
-    });
+    const second = await request(app)
+      .post('/api/v1/urls')
+      .set(authHeaders)
+      .send({
+        originalUrl: 'https://reuse-b.example.com',
+        customCode: code,
+      });
     expect(second.status).toBe(HttpStatusCode.CREATED);
     expect(second.body.shortCode).toBe(code);
   });
 
   it('include_deleted GET after reuse returns active row body', async () => {
-    mockAuthServiceResponse(HttpStatusCode.OK);
     const code = `id${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://reuse-detail-a.example.com',
       customCode: code,
     });
-    await request(app).delete(`/api/v1/urls/${code}`);
+    await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
 
-    const second = await request(app).post('/api/v1/urls').send({
-      originalUrl: 'https://reuse-detail-b.example.com',
-      customCode: code,
-    });
+    const second = await request(app)
+      .post('/api/v1/urls')
+      .set(authHeaders)
+      .send({
+        originalUrl: 'https://reuse-detail-b.example.com',
+        customCode: code,
+      });
     expect(second.status).toBe(HttpStatusCode.CREATED);
 
     const res = await request(app)
@@ -419,12 +455,14 @@ describe('URL API and redirect', () => {
 
   it('second DELETE on same code after soft delete returns 404', async () => {
     const code = `2d${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://twicedel.example.com',
       customCode: code,
     });
-    await request(app).delete(`/api/v1/urls/${code}`);
-    const again = await request(app).delete(`/api/v1/urls/${code}`);
+    await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
+    const again = await request(app)
+      .delete(`/api/v1/urls/${code}`)
+      .set(authHeaders);
     expect(again.status).toBe(HttpStatusCode.NOT_FOUND);
   });
 
@@ -437,8 +475,8 @@ describe('URL API and redirect', () => {
   });
 
   it(
-    'include_deleted list with bearer when auth-service returns 401'
-    , async () => {
+    'include_deleted list with bearer when auth-service returns 401',
+    async () => {
       mockAuthServiceResponse(HttpStatusCode.UNAUTHORIZED);
       const res = await request(app)
         .get('/api/v1/urls?include_deleted=true')
@@ -447,17 +485,18 @@ describe('URL API and redirect', () => {
       expect(res.body.message).toBe(
         'Unauthorized: token missing, invalid, or expired.',
       );
-    });
+    },
+  );
 
   it(
-    'include_deleted envia method/path normalizados para auth-service',
+    'rotas enviam codigo unico e method/path para auth-service',
     async () => {
       const fetchSpy = jest
         .spyOn(globalThis, 'fetch')
         .mockResolvedValue(new Response(null, { status: HttpStatusCode.OK }));
 
       const code = `mp${Date.now().toString(36)}`.slice(0, 10);
-      await request(app).post('/api/v1/urls').send({
+      await request(app).post('/api/v1/urls').set(authHeaders).send({
         originalUrl: 'https://method-path.example.com',
         customCode: code,
       });
@@ -466,17 +505,27 @@ describe('URL API and redirect', () => {
         .get(`/api/v1/urls/${code}?include_deleted=true`)
         .set(authHeaders);
       expect(res.status).toBe(HttpStatusCode.OK);
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
 
-      const [url, init] = fetchSpy.mock.calls[0];
+      const [, postInit] = fetchSpy.mock.calls[0];
+      expect(postInit?.body).toBe(
+        JSON.stringify({
+          code: 'KURTTO_V1_URLS_POST_CREATE',
+          method: 'POST',
+          path: '/api/v1/urls',
+        }),
+      );
+
+      const [url, getInit] = fetchSpy.mock.calls[1];
       expect(String(url)).toContain('/api/v1/auth/authorize-route');
-      expect(init?.method).toBe('POST');
-      expect(init?.headers).toMatchObject({
+      expect(getInit?.method).toBe('POST');
+      expect(getInit?.headers).toMatchObject({
         Authorization: 'Bearer test-token',
         'Content-Type': 'application/json',
       });
-      expect(init?.body).toBe(
+      expect(getInit?.body).toBe(
         JSON.stringify({
+          code: 'KURTTO_V1_URLS_GET_BY_CODE',
           method: 'GET',
           path: '/api/v1/urls/:code',
         }),
@@ -496,23 +545,28 @@ describe('URL API and redirect', () => {
   );
 
   it('DELETE /api/v1/urls/:code returns 404 when missing', async () => {
-    const res = await request(app).delete('/api/v1/urls/zzzzzzzzzz');
+    const res = await request(app)
+      .delete('/api/v1/urls/zzzzzzzzzz')
+      .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
   });
 
   it('PATCH /api/v1/urls/:code returns 422 for empty body', async () => {
     const code = `h${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://empty-patch.example.com',
       customCode: code,
     });
 
-    const res = await request(app).patch(`/api/v1/urls/${code}`).send({});
+    const res = await request(app)
+      .patch(`/api/v1/urls/${code}`)
+      .set(authHeaders)
+      .send({});
     expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
   });
 
   it('POST /api/v1/urls accepts optional future expiresAt', async () => {
-    const res = await request(app).post('/api/v1/urls').send({
+    const res = await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://future.example.com',
       expiresAt: futureIso(),
     });
@@ -522,10 +576,13 @@ describe('URL API and redirect', () => {
 
   it('GET /:code: 302, cache headers, async click increment', async () => {
     const code = `r${Date.now().toString(36)}`.slice(0, 10);
-    const create = await request(app).post('/api/v1/urls').send({
-      originalUrl: 'https://redirect.example.com/path',
-      customCode: code,
-    });
+    const create = await request(app)
+      .post('/api/v1/urls')
+      .set(authHeaders)
+      .send({
+        originalUrl: 'https://redirect.example.com/path',
+        customCode: code,
+      });
     expect(create.status).toBe(HttpStatusCode.CREATED);
     expect(create.body.clicks).toBe(0);
 
@@ -543,25 +600,34 @@ describe('URL API and redirect', () => {
   it('GET /:code returns 404 when short code missing', async () => {
     const res = await request(app).get('/zzzzzzzzzz').redirects(0);
     expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
-    expect(res.body.message).toBe('URL not found');
+    expect(res.body).toEqual({
+      error: 'Not Found',
+      message: 'Short link not found',
+    });
   });
 
   it('GET /:code returns 410 when inactive', async () => {
     const code = `i${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://inactive-redirect.example.com',
       customCode: code,
     });
-    await request(app).patch(`/api/v1/urls/${code}`).send({ isActive: false });
+    await request(app)
+      .patch(`/api/v1/urls/${code}`)
+      .set(authHeaders)
+      .send({ isActive: false });
 
     const res = await request(app).get(`/${code}`).redirects(0);
     expect(res.status).toBe(HttpStatusCode.GONE);
-    expect(res.body.message).toBe('This short link is inactive.');
+    expect(res.body).toEqual({
+      error: 'Gone',
+      message: 'This link has been deactivated',
+    });
   });
 
   it('GET /:code returns 410 when expired and deactivates row', async () => {
     const code = `x${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
       originalUrl: 'https://expired-redirect.example.com',
       customCode: code,
       expiresAt: futureIso(),
@@ -575,9 +641,14 @@ describe('URL API and redirect', () => {
 
     const res = await request(app).get(`/${code}`).redirects(0);
     expect(res.status).toBe(HttpStatusCode.GONE);
-    expect(res.body.message).toBe('This short link has expired.');
+    expect(res.body).toEqual({
+      error: 'Gone',
+      message: 'This link has expired',
+    });
 
-    const getOne = await request(app).get(`/api/v1/urls/${code}`);
+    const getOne = await request(app)
+      .get(`/api/v1/urls/${code}`)
+      .set(authHeaders);
     expect(getOne.status).toBe(HttpStatusCode.OK);
     expect(getOne.body.isActive).toBe(false);
   });

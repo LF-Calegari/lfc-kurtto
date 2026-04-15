@@ -6,6 +6,7 @@ import { AppError } from '@errors/AppError';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
 
 type RouteAuthorizationPayload = {
+  code?: string;
   method: string;
   path: string;
 };
@@ -63,15 +64,17 @@ async function callAuthService(
   );
 
   try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+    const response = await fetch(
+      endpoint, 
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
       },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
+    );
 
     if (response.status === HttpStatusCode.OK) {
       return;
@@ -95,6 +98,7 @@ async function callAuthService(
       'Auth-service returned unexpected status on route authorization',
       {
         context: 'auth',
+        code: payload.code,
         method: payload.method,
         path: payload.path,
         statusCode: response.status,
@@ -112,6 +116,7 @@ async function callAuthService(
 
     logger.error('Failed to authorize route via auth-service', {
       context: 'auth',
+      code: payload.code,
       method: payload.method,
       path: payload.path,
       message: error instanceof Error ? error.message : String(error),
@@ -128,6 +133,7 @@ async function callAuthService(
 
 export function authorizeRoute(
   shouldAuthorize: (req: Request) => boolean = () => true,
+  resolveRouteCode?: (req: Request) => string | undefined,
 ): RequestHandler {
   return async (req: Request, _res: Response, next: NextFunction) => {
     if (!shouldAuthorize(req)) {
@@ -147,6 +153,7 @@ export function authorizeRoute(
     }
 
     const payload: RouteAuthorizationPayload = {
+      code: resolveRouteCode?.(req),
       method: req.method.toUpperCase(),
       path: normalizedRoutePath(req),
     };

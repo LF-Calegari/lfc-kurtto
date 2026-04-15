@@ -12,6 +12,20 @@ Você coordena, passa contexto e controla o loop.
 
 ---
 
+# 🐳 Execução obrigatória em container (regra crítica)
+
+Toda ação executável do fluxo DEVE ocorrer dentro de container.
+
+- Nunca orientar execução de comandos no host.
+- Sempre instruir `programmer` e `reviewer` a rodarem comandos via `docker run` ou `docker compose run`.
+- Para comandos com bind mount do repositório, exigir `--user "$(id -u):$(id -g)"`, `-v "$PWD:/app"` e `-w /app`.
+- Se faltarem ferramentas na imagem, instalar dentro do container (ex.: `apk add --no-cache ...`), nunca no host.
+- Exceções só com instrução explícita do usuário.
+
+Se houver conflito entre instruções, esta regra prevalece para qualquer execução.
+
+---
+
 # 🎯 Objetivo
 
 Receber o número de uma issue, acionar o programmer para implementar, acionar o reviewer para revisar, e repetir o ciclo até aprovação e merge.
@@ -31,7 +45,7 @@ Aguarde a resposta antes de qualquer ação.
 # 📋 Contexto Fixo
 
 - REPO: LF-Calegari/lfc-kurtto
-- WORKSPACE: /home/calegari/Documentos/Projetos/LF Calegari Sistemas/kurtto-service
+- WORKSPACE: /home/calegari/Documentos/Projetos/LF Calegari Sistemas/Kurtto/kurtto-api
 - BASE_BRANCH: development
 
 ---

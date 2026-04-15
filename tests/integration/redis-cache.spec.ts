@@ -1,4 +1,11 @@
-import { afterEach, describe, expect, it } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import request from 'supertest';
 
 import { AppDataSource } from '@config/data-source';
@@ -13,10 +20,23 @@ import { useIntegrationDatabase } from '../helpers/setup';
 const hasRedis = Boolean(process.env.REDIS_URL?.trim());
 const describeRedis = hasRedis ? describe : describe.skip;
 
+const authHeaders = { Authorization: 'Bearer test-token' };
+
+function mockAuthServiceResponse(status: number): void {
+  jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(new Response(null, { status }));
+}
+
 describeRedis('Redis redirect cache', () => {
   useIntegrationDatabase();
 
+  beforeEach(() => {
+    mockAuthServiceResponse(HttpStatusCode.OK);
+  });
+
   afterEach(async () => {
+    jest.restoreAllMocks();
     const r = getRedisClient();
     if (r) {
       await r.flushdb();
@@ -28,10 +48,13 @@ describeRedis('Redis redirect cache', () => {
     expect(r).not.toBeNull();
     const code = `q${Date.now().toString(36)}`.slice(0, 10);
 
-    const create = await request(app).post('/api/v1/urls').send({
-      originalUrl: 'https://cache-hit.example.com',
-      customCode: code,
-    });
+    const create = await request(app)
+      .post('/api/v1/urls')
+      .set(authHeaders)
+      .send({
+        originalUrl: 'https://cache-hit.example.com',
+        customCode: code,
+      });
     expect(create.status).toBe(HttpStatusCode.CREATED);
 
     const first = await request(app).get(`/${code}`).redirects(0);
@@ -56,17 +79,23 @@ describeRedis('Redis redirect cache', () => {
     expect(r).not.toBeNull();
     const code = `w${Date.now().toString(36)}`.slice(0, 10);
 
-    await request(app).post('/api/v1/urls').send({
-      originalUrl: 'https://before-patch.example.com',
-      customCode: code,
-    });
+    await request(app)
+      .post('/api/v1/urls')
+      .set(authHeaders)
+      .send({
+        originalUrl: 'https://before-patch.example.com',
+        customCode: code,
+      });
     await request(app).get(`/${code}`).redirects(0);
     const beforePatch = await r!.get(`url:${code}`);
     expect(beforePatch).toBeTruthy();
 
-    await request(app).patch(`/api/v1/urls/${code}`).send({
-      originalUrl: 'https://after-patch.example.com',
-    });
+    await request(app)
+      .patch(`/api/v1/urls/${code}`)
+      .set(authHeaders)
+      .send({
+        originalUrl: 'https://after-patch.example.com',
+      });
 
     expect(await r!.get(`url:${code}`)).toBeNull();
 
@@ -83,12 +112,15 @@ describeRedis('Redis redirect cache', () => {
 
   it('invalidates cache after DELETE', async () => {
     const code = `z${Date.now().toString(36)}`.slice(0, 10);
-    await request(app).post('/api/v1/urls').send({
-      originalUrl: 'https://to-delete.example.com',
-      customCode: code,
-    });
+    await request(app)
+      .post('/api/v1/urls')
+      .set(authHeaders)
+      .send({
+        originalUrl: 'https://to-delete.example.com',
+        customCode: code,
+      });
     await request(app).get(`/${code}`).redirects(0);
-    await request(app).delete(`/api/v1/urls/${code}`);
+    await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
 
     const res = await request(app).get(`/${code}`).redirects(0);
     expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
@@ -99,11 +131,14 @@ describeRedis('Redis redirect cache', () => {
     const r = getRedisClient();
     expect(r).not.toBeNull();
 
-    await request(app).post('/api/v1/urls').send({
-      originalUrl: 'https://stale-exp.example.com',
-      customCode: code,
-      expiresAt: new Date(Date.now() + 86400000).toISOString(),
-    });
+    await request(app)
+      .post('/api/v1/urls')
+      .set(authHeaders)
+      .send({
+        originalUrl: 'https://stale-exp.example.com',
+        customCode: code,
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      });
     await request(app).get(`/${code}`).redirects(0);
 
     const past = new Date('2000-01-01T00:00:00.000Z');
