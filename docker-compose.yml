@@ -10,6 +10,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./docker/postgres/create-test-db.sh:/docker-entrypoint-initdb.d/create-test-db.sh:ro
+    networks:
+      - default
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-kurtto}"]
       interval: 5s
@@ -20,6 +22,8 @@ services:
     image: redis:8.6-alpine
     ports:
       - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - default
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -30,6 +34,8 @@ services:
     build:
       context: .
       target: development
+    networks:
+      - default
     depends_on:
       db:
         condition: service_healthy
@@ -61,6 +67,8 @@ services:
     build:
       context: .
       target: development
+    networks:
+      - default
     depends_on:
       db:
         condition: service_healthy
@@ -95,6 +103,8 @@ services:
     build:
       context: .
       target: development
+    networks:
+      - default
     depends_on:
       db:
         condition: service_healthy
