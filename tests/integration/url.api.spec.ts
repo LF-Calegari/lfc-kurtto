@@ -269,6 +269,29 @@ describe('URL API and redirect', () => {
     expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
   });
 
+  it('GET /api/v1/urls 422 when clicks filter is negative', async () => {
+    for (const q of [
+      'clicks__exact=-1',
+      'clicks__gt=-1',
+      'clicks__lt=-1',
+    ]) {
+      const res = await request(app)
+        .get(`/api/v1/urls?${q}`)
+        .set(authHeaders);
+      expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+    }
+  });
+
+  it('GET /api/v1/urls 422 for negative clicks__between bounds', async () => {
+    for (const between of ['-1,5', '0,-1']) {
+      const res = await request(app)
+        .get('/api/v1/urls')
+        .query({ clicks__between: between, limit: 10 })
+        .set(authHeaders);
+      expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+    }
+  });
+
   it('is_active__exact overrides active when both are sent', async () => {
     const code = `ov${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').set(authHeaders).send({

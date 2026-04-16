@@ -30,17 +30,18 @@ function optionalQueryString(
   );
 }
 
-function optionalQueryCoercedInt(): z.ZodType<number | undefined> {
+/** Inteiro >= 0 para filtros de `clicks` (contador não admite valores negativos). */
+function optionalQueryCoercedNonNegativeInt(): z.ZodType<number | undefined> {
   return z.preprocess(
     (v) => queryScalarToOptionalString(v),
-    z
-      .union([
-        z.undefined(),
-        z
-          .string()
-          .regex(/^-?\d+$/, { message: 'must be an integer' })
-          .transform((s) => Number.parseInt(s, 10)),
-      ]),
+    z.union([
+      z.undefined(),
+      z
+        .string()
+        .regex(/^-?\d+$/, { message: 'must be an integer' })
+        .transform((s) => Number.parseInt(s, 10))
+        .pipe(z.number().int().min(0)),
+    ]),
   );
 }
 
@@ -160,9 +161,9 @@ const listUrlsQueryObjectSchema = z
     short_code__like: optionalQueryString(
       z.string().min(1).max(LIST_LIKE_MAX_LEN),
     ),
-    clicks__lt: optionalQueryCoercedInt(),
-    clicks__gt: optionalQueryCoercedInt(),
-    clicks__exact: optionalQueryCoercedInt(),
+    clicks__lt: optionalQueryCoercedNonNegativeInt(),
+    clicks__gt: optionalQueryCoercedNonNegativeInt(),
+    clicks__exact: optionalQueryCoercedNonNegativeInt(),
     clicks__between: optionalQueryString(z.string().min(1)),
     expires_at__lt: optionalQueryString(z.string().min(1)),
     expires_at__gt: optionalQueryString(z.string().min(1)),
@@ -196,6 +197,14 @@ const listUrlsQueryObjectSchema = z
           message:
             'clicks__between must be two integers separated by a comma ' +
             '(e.g. 0,100)',
+          path: [path],
+        });
+        return;
+      }
+      if (pair[0] < 0 || pair[1] < 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'clicks__between bounds must be >= 0',
           path: [path],
         });
         return;
