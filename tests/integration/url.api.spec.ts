@@ -2,6 +2,7 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 
 import { AppDataSource } from '@config/data-source';
+import { env } from '@config/env';
 import { Url } from '@entities/Url';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
 
@@ -241,7 +242,7 @@ describe('URL API and redirect', () => {
   it('GET /api/v1/urls unknown short_code__exact empty list', async () => {
     const res = await request(app)
       .get('/api/v1/urls')
-      .query({ short_code__exact: 'zznonexist99', limit: 10 })
+      .query({ short_code__exact: 'zznonexist', limit: 10 })
       .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.OK);
     expect(res.body.data).toEqual([]);
@@ -665,7 +666,7 @@ describe('URL API and redirect', () => {
       );
 
       const [url, getInit] = fetchSpy.mock.calls[1];
-      expect(String(url)).toContain('/api/v1/auth/authorize-route');
+      expect(String(url)).toContain(env.AUTH_SERVICE_AUTHORIZE_ROUTE_PATH);
       expect(getInit?.method).toBe('POST');
       expect(getInit?.headers).toMatchObject({
         Authorization: 'Bearer test-token',
