@@ -145,6 +145,25 @@ describe('URL API and redirect', () => {
     expect(typeof res.body.meta.total_pages).toBe('number');
   });
 
+  it('GET /api/v1/urls?q= applies textual search on list', async () => {
+    const marker = `qsrch-${Date.now()}`;
+    const code = `q${Date.now().toString(36)}`.slice(0, 10);
+    await request(app)
+      .post('/api/v1/urls')
+      .set(authHeaders)
+      .send({
+        originalUrl: `https://example.com/${marker}-suffix`,
+        customCode: code,
+      });
+
+    const res = await request(app)
+      .get(`/api/v1/urls?q=${encodeURIComponent(marker)}&limit=100`)
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    const codes = res.body.data.map((row: { shortCode: string }) => row.shortCode);
+    expect(codes).toContain(code);
+  });
+
   it('GET /api/v1/urls?active=false filters inactive rows', async () => {
     const code = `e${Date.now().toString(36)}`.slice(0, 10);
     await request(app).post('/api/v1/urls').set(authHeaders).send({

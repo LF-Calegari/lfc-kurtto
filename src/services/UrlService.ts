@@ -135,6 +135,8 @@ export class UrlService {
       limit: query.limit,
       active: query.active,
       withDeleted: query.include_deleted === true,
+      q: query.q,
+      shortUrlSearchBase: env.BASE_URL,
     });
     const totalPages =
       total === 0 ? 0 : Math.ceil(total / query.limit);

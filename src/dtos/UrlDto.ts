@@ -54,6 +54,17 @@ export const PatchUrlSchema = z
 
 export type PatchUrlDto = z.infer<typeof PatchUrlSchema>;
 
+const optionalSearchQ = z.preprocess((val) => {
+  if (val === undefined || val === null || val === '') {
+    return undefined;
+  }
+  if (Array.isArray(val)) {
+    const first = val[0];
+    return typeof first === 'string' ? first : undefined;
+  }
+  return typeof val === 'string' ? val : String(val);
+}, z.string().trim().max(200).optional()).transform((s) => (s === undefined || s === '' ? undefined : s));
+
 export const ListUrlsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
@@ -69,6 +80,7 @@ export const ListUrlsQuerySchema = z.object({
     .transform((val) =>
       val === undefined ? undefined : val === 'true',
     ),
+  q: optionalSearchQ,
 });
 
 export type ListUrlsQueryDto = z.infer<typeof ListUrlsQuerySchema>;

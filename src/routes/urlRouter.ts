@@ -132,6 +132,12 @@ urlRouter.patch(
  *         schema:
  *           type: string
  *           enum: [true, false]
+ *       - in: query
+ *         name: q
+ *         description: Busca textual em codigo curto, URL original e URL curta (prefixo BASE_URL)
+ *         schema:
+ *           type: string
+ *           maxLength: 200
  *     responses:
  *       200:
  *         description: Lista paginada

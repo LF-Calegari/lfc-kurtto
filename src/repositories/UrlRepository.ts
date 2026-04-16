@@ -1,3 +1,5 @@
+import { Brackets } from 'typeorm';
+
 import { AppDataSource } from '@config/data-source';
 import { Url } from '@entities/Url';
 
@@ -42,24 +44,57 @@ export function createUrlEntity(partial: {
   });
 }
 
+/** Remove metacaracteres de LIKE para uso seguro em ILIKE com parâmetro. */
+function sanitizeLikeFragment(raw: string): string {
+  return raw.replace(/\\/g, '').replace(/%/g, '').replace(/_/g, '');
+}
+
 export async function listUrls(params: {
   page: number;
   limit: number;
   active?: boolean;
   withDeleted?: boolean;
+  q?: string;
+  shortUrlSearchBase?: string;
 }): Promise<{ rows: Url[]; total: number }> {
   const repo = AppDataSource.getRepository(Url);
-  const where =
-    params.active === undefined ? {} : { isActive: params.active };
+  const qb = repo.createQueryBuilder('url');
 
-  const [rows, total] = await repo.findAndCount({
-    where,
-    order: { createdAt: 'DESC' },
-    skip: (params.page - 1) * params.limit,
-    take: params.limit,
-    withDeleted: params.withDeleted === true,
-  });
+  if (params.withDeleted === true) {
+    qb.withDeleted();
+  }
 
+  if (params.active !== undefined) {
+    qb.andWhere('url.isActive = :isActive', { isActive: params.active });
+  }
+
+  const rawTerm = params.q?.trim();
+  if (rawTerm && rawTerm.length > 0) {
+    const safe = sanitizeLikeFragment(rawTerm);
+    if (safe.length > 0) {
+      const pat = `%${safe}%`;
+      const base = params.shortUrlSearchBase?.replace(/\/$/, '') ?? '';
+      qb.andWhere(
+        new Brackets((w) => {
+          w.where('url.shortCode ILIKE :searchPat', { searchPat: pat }).orWhere(
+            'url.originalUrl ILIKE :searchPat',
+            { searchPat: pat },
+          );
+          if (base.length > 0) {
+            w.orWhere("CONCAT(:searchBase, '/', url.shortCode) ILIKE :searchPat", {
+              searchBase: base,
+              searchPat: pat,
+            });
+          }
+        }),
+      );
+    }
+  }
+
+  qb.orderBy('url.createdAt', 'DESC');
+  qb.skip((params.page - 1) * params.limit).take(params.limit);
+
+  const [rows, total] = await qb.getManyAndCount();
   return { rows, total };
 }
 
