@@ -87,3 +87,92 @@ describe('UrlService.create', () => {
     expect(genMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('UrlService.list', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    repoMocks.listUrls.mockResolvedValue({ rows: [], total: 0 });
+  });
+
+  it('maps query to repository filters and meta', async () => {
+    const { default: urlService } = await import('@services/UrlService');
+    const result = await urlService.list({
+      page: 2,
+      limit: 5,
+      active: true,
+      include_deleted: false,
+      is_active__exact: undefined,
+      id__exact: '550e8400-e29b-41d4-a716-446655440000',
+      id__like: '%55%',
+      original_url__exact: 'https://a.com',
+      original_url__like: '%b%',
+      short_code__exact: 'abc',
+      short_code__like: '%c%',
+      clicks__lt: 10,
+      clicks__gt: 1,
+      clicks__exact: 5,
+      clicks__between: '0,9',
+      expires_at__lt: '2099-01-01T00:00:00.000Z',
+      expires_at__gt: '2000-01-01T00:00:00.000Z',
+      expires_at__exact: '2020-01-01T00:00:00.000Z',
+      expires_at__between: '2000-01-01T00:00:00.000Z,2099-01-01T00:00:00.000Z',
+      created_at__lt: '2099-01-01T00:00:00.000Z',
+      created_at__gt: '2000-01-01T00:00:00.000Z',
+      created_at__exact: '2020-01-01T00:00:00.000Z',
+      created_at__between: '2000-01-01T00:00:00.000Z,2099-01-01T00:00:00.000Z',
+      updated_at__lt: '2099-01-01T00:00:00.000Z',
+      updated_at__gt: '2000-01-01T00:00:00.000Z',
+      updated_at__exact: '2020-01-01T00:00:00.000Z',
+      updated_at__between: '2000-01-01T00:00:00.000Z,2099-01-01T00:00:00.000Z',
+      deleted_at__lt: '2099-01-01T00:00:00.000Z',
+      deleted_at__gt: '2000-01-01T00:00:00.000Z',
+      deleted_at__exact: '2020-01-01T00:00:00.000Z',
+      deleted_at__between: '2000-01-01T00:00:00.000Z,2099-01-01T00:00:00.000Z',
+    });
+
+    expect(result.meta.page).toBe(2);
+    expect(result.meta.limit).toBe(5);
+    expect(result.meta.total).toBe(0);
+    expect(result.meta.total_pages).toBe(0);
+    expect(repoMocks.listUrls).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 2,
+        limit: 5,
+        active: true,
+        withDeleted: false,
+        filters: expect.objectContaining({
+          stringExact: expect.arrayContaining([
+            { field: 'id', value: '550e8400-e29b-41d4-a716-446655440000' },
+            { field: 'originalUrl', value: 'https://a.com' },
+            { field: 'shortCode', value: 'abc' },
+          ]),
+          stringLike: expect.arrayContaining([
+            { field: 'id', pattern: '%55%' },
+            { field: 'originalUrl', pattern: '%b%' },
+            { field: 'shortCode', pattern: '%c%' },
+          ]),
+          clicks: expect.arrayContaining([
+            { op: 'lt', value: 10 },
+            { op: 'gt', value: 1 },
+            { op: 'exact', value: 5 },
+            { op: 'between', low: 0, high: 9 },
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('uses is_active__exact over active when both are set', async () => {
+    const { default: urlService } = await import('@services/UrlService');
+    await urlService.list({
+      page: 1,
+      limit: 10,
+      active: true,
+      is_active__exact: false,
+      include_deleted: undefined,
+    });
+    expect(repoMocks.listUrls).toHaveBeenCalledWith(
+      expect.objectContaining({ active: false }),
+    );
+  });
+});
