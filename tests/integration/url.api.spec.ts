@@ -2,6 +2,7 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 
 import { AppDataSource } from '@config/data-source';
+import { env } from '@config/env';
 import { Url } from '@entities/Url';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
 
@@ -158,6 +159,154 @@ describe('URL API and redirect', () => {
 
     const res = await request(app)
       .get('/api/v1/urls?active=false&limit=100')
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    const found = res.body.data.find(
+      (row: { shortCode: string }) => row.shortCode === code,
+    );
+    expect(found).toBeTruthy();
+  });
+
+  it('GET /api/v1/urls short_code__exact returns single row', async () => {
+    const code = `fe${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
+      originalUrl: 'https://filter-exact.example.com',
+      customCode: code,
+    });
+    const res = await request(app)
+      .get('/api/v1/urls')
+      .query({ short_code__exact: code, limit: 10 })
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    expect(res.body.data.length).toBe(1);
+    expect(res.body.data[0].shortCode).toBe(code);
+  });
+
+  it('GET /api/v1/urls original_url__like matches substring', async () => {
+    const marker = `like-${Date.now()}`;
+    const code = `lk${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
+      originalUrl: `https://example.com/${marker}/path`,
+      customCode: code,
+    });
+    const res = await request(app)
+      .get('/api/v1/urls')
+      .query({ original_url__like: `%${marker}%`, limit: 50 })
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    const found = res.body.data.find(
+      (row: { shortCode: string }) => row.shortCode === code,
+    );
+    expect(found).toBeTruthy();
+  });
+
+  it('GET /api/v1/urls clicks__between and short_code__exact', async () => {
+    const code = `cb${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
+      originalUrl: 'https://clicks-between.example.com',
+      customCode: code,
+    });
+    const res = await request(app)
+      .get('/api/v1/urls')
+      .query({
+        clicks__between: '0,1000',
+        short_code__exact: code,
+        limit: 10,
+      })
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    expect(res.body.data.length).toBe(1);
+    expect(res.body.data[0].shortCode).toBe(code);
+  });
+
+  it('GET /api/v1/urls created_at__between inclusive range', async () => {
+    const code = `dt${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
+      originalUrl: 'https://date-between.example.com',
+      customCode: code,
+    });
+    const start = '2000-01-01T00:00:00.000Z';
+    const end = '2099-12-31T23:59:59.999Z';
+    const res = await request(app)
+      .get('/api/v1/urls')
+      .query({
+        created_at__between: `${start},${end}`,
+        short_code__exact: code,
+        limit: 10,
+      })
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    expect(res.body.data.length).toBe(1);
+  });
+
+  it('GET /api/v1/urls unknown short_code__exact empty list', async () => {
+    const res = await request(app)
+      .get('/api/v1/urls')
+      .query({ short_code__exact: 'zznonexist', limit: 10 })
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.meta.total).toBe(0);
+  });
+
+  it('GET /api/v1/urls returns 422 for invalid id__exact', async () => {
+    const res = await request(app)
+      .get('/api/v1/urls?id__exact=not-a-uuid')
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+  });
+
+  it('GET /api/v1/urls 422 when clicks__between order invalid', async () => {
+    const res = await request(app)
+      .get('/api/v1/urls?clicks__between=10,1')
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+  });
+
+  it('GET /api/v1/urls 422 when clicks__between malformed', async () => {
+    const res = await request(app)
+      .get('/api/v1/urls?clicks__between=1')
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+  });
+
+  it('GET /api/v1/urls 422 when clicks filter is negative', async () => {
+    for (const q of [
+      'clicks__exact=-1',
+      'clicks__gt=-1',
+      'clicks__lt=-1',
+    ]) {
+      const res = await request(app)
+        .get(`/api/v1/urls?${q}`)
+        .set(authHeaders);
+      expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+    }
+  });
+
+  it('GET /api/v1/urls 422 for negative clicks__between bounds', async () => {
+    for (const between of ['-1,5', '0,-1']) {
+      const res = await request(app)
+        .get('/api/v1/urls')
+        .query({ clicks__between: between, limit: 10 })
+        .set(authHeaders);
+      expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+    }
+  });
+
+  it('is_active__exact overrides active when both are sent', async () => {
+    const code = `ov${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').set(authHeaders).send({
+      originalUrl: 'https://override-active.example.com',
+      customCode: code,
+    });
+    await request(app)
+      .patch(`/api/v1/urls/${code}`)
+      .set(authHeaders)
+      .send({ isActive: false });
+
+    const res = await request(app)
+      .get('/api/v1/urls')
+      .query({ active: 'true', is_active__exact: 'false', limit: 100 })
       .set(authHeaders);
     expect(res.status).toBe(HttpStatusCode.OK);
     const found = res.body.data.find(
@@ -517,7 +666,7 @@ describe('URL API and redirect', () => {
       );
 
       const [url, getInit] = fetchSpy.mock.calls[1];
-      expect(String(url)).toContain('/api/v1/auth/authorize-route');
+      expect(String(url)).toContain(env.AUTH_SERVICE_AUTHORIZE_ROUTE_PATH);
       expect(getInit?.method).toBe('POST');
       expect(getInit?.headers).toMatchObject({
         Authorization: 'Bearer test-token',

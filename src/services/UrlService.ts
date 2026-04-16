@@ -5,10 +5,12 @@ import { logger } from '@config/logger';
 import cacheService from '@services/CacheService';
 import { AppError } from '@errors/AppError';
 import { ConflictError } from '@errors/ConflictError';
-import type {
-  CreateUrlDto,
-  ListUrlsQueryDto,
-  PatchUrlDto,
+import {
+  type CreateUrlDto,
+  type ListUrlsQueryDto,
+  type PatchUrlDto,
+  parseDatePair,
+  parseIntPair,
 } from '@dtos/UrlDto';
 import type { Url } from '@entities/Url';
 import {
@@ -21,10 +23,118 @@ import {
   softDeleteUrlByShortCode,
   updateUrlByShortCode,
 } from '@repositories/UrlRepository';
+import type {
+  UrlDateFilterField,
+  UrlListRepoFilter,
+} from '@repositories/UrlRepository';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
 import { generateShortCode } from '@utils/shortCode';
 
 const MAX_SHORT_CODE_ATTEMPTS = 5;
+
+function emptyUrlListRepoFilter(): UrlListRepoFilter {
+  return { stringExact: [], stringLike: [], clicks: [], dates: [] };
+}
+
+function buildUrlListRepoFilter(query: ListUrlsQueryDto): UrlListRepoFilter {
+  const f = emptyUrlListRepoFilter();
+  if (query.id__exact) {
+    f.stringExact.push({ field: 'id', value: query.id__exact });
+  }
+  if (query.id__like) {
+    f.stringLike.push({ field: 'id', pattern: query.id__like });
+  }
+  if (query.original_url__exact) {
+    f.stringExact.push({
+      field: 'originalUrl',
+      value: query.original_url__exact,
+    });
+  }
+  if (query.original_url__like) {
+    f.stringLike.push({
+      field: 'originalUrl',
+      pattern: query.original_url__like,
+    });
+  }
+  if (query.short_code__exact) {
+    f.stringExact.push({
+      field: 'shortCode',
+      value: query.short_code__exact,
+    });
+  }
+  if (query.short_code__like) {
+    f.stringLike.push({
+      field: 'shortCode',
+      pattern: query.short_code__like,
+    });
+  }
+  if (query.clicks__lt !== undefined) {
+    f.clicks.push({ op: 'lt', value: query.clicks__lt });
+  }
+  if (query.clicks__gt !== undefined) {
+    f.clicks.push({ op: 'gt', value: query.clicks__gt });
+  }
+  if (query.clicks__exact !== undefined) {
+    f.clicks.push({ op: 'exact', value: query.clicks__exact });
+  }
+  if (query.clicks__between) {
+    const pair = parseIntPair(query.clicks__between);
+    if (pair) {
+      f.clicks.push({ op: 'between', low: pair[0], high: pair[1] });
+    }
+  }
+
+  const pushDateScalar = (
+    field: UrlDateFilterField,
+    op: 'lt' | 'gt' | 'exact',
+    raw: string | undefined,
+  ): void => {
+    if (raw === undefined) {
+      return;
+    }
+    f.dates.push({ field, op, at: new Date(raw) });
+  };
+
+  const pushDateBetween = (
+    field: UrlDateFilterField,
+    raw: string | undefined,
+  ): void => {
+    if (raw === undefined) {
+      return;
+    }
+    const pair = parseDatePair(raw);
+    if (pair) {
+      f.dates.push({
+        field,
+        op: 'between',
+        low: pair[0],
+        high: pair[1],
+      });
+    }
+  };
+
+  pushDateScalar('expiresAt', 'lt', query.expires_at__lt);
+  pushDateScalar('expiresAt', 'gt', query.expires_at__gt);
+  pushDateScalar('expiresAt', 'exact', query.expires_at__exact);
+  pushDateBetween('expiresAt', query.expires_at__between);
+
+  pushDateScalar('createdAt', 'lt', query.created_at__lt);
+  pushDateScalar('createdAt', 'gt', query.created_at__gt);
+  pushDateScalar('createdAt', 'exact', query.created_at__exact);
+  pushDateBetween('createdAt', query.created_at__between);
+
+  pushDateScalar('updatedAt', 'lt', query.updated_at__lt);
+  pushDateScalar('updatedAt', 'gt', query.updated_at__gt);
+  pushDateScalar('updatedAt', 'exact', query.updated_at__exact);
+  pushDateBetween('updatedAt', query.updated_at__between);
+
+  pushDateScalar('deletedAt', 'lt', query.deleted_at__lt);
+  pushDateScalar('deletedAt', 'gt', query.deleted_at__gt);
+  pushDateScalar('deletedAt', 'exact', query.deleted_at__exact);
+  pushDateBetween('deletedAt', query.deleted_at__between);
+
+  return f;
+}
 
 function isUniqueViolation(error: unknown): boolean {
   if (!(error instanceof QueryFailedError)) {
@@ -130,11 +240,16 @@ export class UrlService {
       total_pages: number;
     };
   }> {
+    const isActiveFilter =
+      query.is_active__exact !== undefined
+        ? query.is_active__exact
+        : query.active;
     const { rows, total } = await listUrls({
       page: query.page,
       limit: query.limit,
-      active: query.active,
+      active: isActiveFilter,
       withDeleted: query.include_deleted === true,
+      filters: buildUrlListRepoFilter(query),
     });
     const totalPages =
       total === 0 ? 0 : Math.ceil(total / query.limit);

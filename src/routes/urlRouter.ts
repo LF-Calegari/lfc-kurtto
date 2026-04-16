@@ -122,7 +122,7 @@ urlRouter.patch(
  *           default: 10
  *       - in: query
  *         name: active
- *         description: Filtra por ativo (string "true" ou "false")
+ *         description: Filtra por ativo (string "true" ou "false"). Se is_active__exact tambem for enviado, is_active__exact prevalece.
  *         schema:
  *           type: string
  *           enum: [true, false]
@@ -132,6 +132,101 @@ urlRouter.patch(
  *         schema:
  *           type: string
  *           enum: [true, false]
+ *       - in: query
+ *         name: is_active__exact
+ *         description: Filtro exato de is_active ("true"/"false"); prevalece sobre o parametro active quando ambos existem.
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *       - in: query
+ *         name: id__exact
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: id__like
+ *         description: Correspondencia parcial ILIKE sobre o UUID em texto (use % como curinga).
+ *         schema: { type: string, maxLength: 200 }
+ *       - in: query
+ *         name: original_url__exact
+ *         schema: { type: string }
+ *       - in: query
+ *         name: original_url__like
+ *         description: ILIKE em original_url (use % como curinga).
+ *         schema: { type: string, maxLength: 200 }
+ *       - in: query
+ *         name: short_code__exact
+ *         schema: { type: string, maxLength: 10 }
+ *       - in: query
+ *         name: short_code__like
+ *         description: ILIKE em short_code (use % como curinga).
+ *         schema: { type: string, maxLength: 200 }
+ *       - in: query
+ *         name: clicks__lt
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: clicks__gt
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: clicks__exact
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: clicks__between
+ *         description: Dois inteiros separados por virgula, intervalo fechado (ex. 0,100).
+ *         schema: { type: string }
+ *       - in: query
+ *         name: expires_at__lt
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: expires_at__gt
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: expires_at__exact
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: expires_at__between
+ *         description: Dois ISO 8601 separados por virgula, intervalo fechado (UTC).
+ *         schema: { type: string }
+ *       - in: query
+ *         name: created_at__lt
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: created_at__gt
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: created_at__exact
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: created_at__between
+ *         description: Dois ISO 8601 separados por virgula, intervalo fechado (UTC).
+ *         schema: { type: string }
+ *       - in: query
+ *         name: updated_at__lt
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: updated_at__gt
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: updated_at__exact
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: updated_at__between
+ *         description: Dois ISO 8601 separados por virgula, intervalo fechado (UTC).
+ *         schema: { type: string }
+ *       - in: query
+ *         name: deleted_at__lt
+ *         description: Combinar com include_deleted=true para filtrar linhas soft-deleted.
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: deleted_at__gt
+ *         description: Combinar com include_deleted=true para filtrar linhas soft-deleted.
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: deleted_at__exact
+ *         description: Combinar com include_deleted=true para filtrar linhas soft-deleted.
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: deleted_at__between
+ *         description: Dois ISO 8601 separados por virgula, intervalo fechado (UTC); usar com include_deleted=true para tumbas.
+ *         schema: { type: string }
  *     responses:
  *       200:
  *         description: Lista paginada

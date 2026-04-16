@@ -1,5 +1,118 @@
+import type { SelectQueryBuilder } from 'typeorm';
+
 import { AppDataSource } from '@config/data-source';
 import { Url } from '@entities/Url';
+
+export type UrlStringFilterField = 'id' | 'originalUrl' | 'shortCode';
+
+export type UrlDateFilterField =
+  | 'expiresAt'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'deletedAt';
+
+export type UrlListRepoFilter = {
+  stringExact: { field: UrlStringFilterField; value: string }[];
+  stringLike: { field: UrlStringFilterField; pattern: string }[];
+  clicks: (
+    | { op: 'lt' | 'gt' | 'exact'; value: number }
+    | { op: 'between'; low: number; high: number }
+  )[];
+  dates: (
+    | { field: UrlDateFilterField; op: 'lt' | 'gt' | 'exact'; at: Date }
+    | { field: UrlDateFilterField; op: 'between'; low: Date; high: Date }
+  )[];
+};
+
+function entityPathForStringField(field: UrlStringFilterField): string {
+  switch (field) {
+    case 'id':
+      return 'url.id';
+    case 'originalUrl':
+      return 'url.originalUrl';
+    case 'shortCode':
+      return 'url.shortCode';
+    default: {
+      const _exhaustive: never = field;
+      return _exhaustive;
+    }
+  }
+}
+
+function entityPathForDateField(field: UrlDateFilterField): string {
+  switch (field) {
+    case 'expiresAt':
+      return 'url.expiresAt';
+    case 'createdAt':
+      return 'url.createdAt';
+    case 'updatedAt':
+      return 'url.updatedAt';
+    case 'deletedAt':
+      return 'url.deletedAt';
+    default: {
+      const _exhaustive: never = field;
+      return _exhaustive;
+    }
+  }
+}
+
+function applyUrlListRepoFilters(
+  qb: SelectQueryBuilder<Url>,
+  filters: UrlListRepoFilter,
+): void {
+  let p = 0;
+  const next = (): string => {
+    p += 1;
+    return `f${p}`;
+  };
+
+  for (const { field, value } of filters.stringExact) {
+    const col = entityPathForStringField(field);
+    const name = next();
+    qb.andWhere(`${col} = :${name}`, { [name]: value });
+  }
+
+  for (const { field, pattern } of filters.stringLike) {
+    const name = next();
+    if (field === 'id') {
+      qb.andWhere(`CAST(url.id AS TEXT) ILIKE :${name}`, { [name]: pattern });
+    } else {
+      const col = entityPathForStringField(field);
+      qb.andWhere(`${col} ILIKE :${name}`, { [name]: pattern });
+    }
+  }
+
+  for (const c of filters.clicks) {
+    if (c.op === 'between') {
+      const a = next();
+      const b = next();
+      qb.andWhere(`url.clicks BETWEEN :${a} AND :${b}`, {
+        [a]: c.low,
+        [b]: c.high,
+      });
+    } else {
+      const name = next();
+      const op = c.op === 'lt' ? '<' : c.op === 'gt' ? '>' : '=';
+      qb.andWhere(`url.clicks ${op} :${name}`, { [name]: c.value });
+    }
+  }
+
+  for (const d of filters.dates) {
+    const col = entityPathForDateField(d.field);
+    if (d.op === 'between') {
+      const a = next();
+      const b = next();
+      qb.andWhere(`${col} BETWEEN :${a} AND :${b}`, {
+        [a]: d.low,
+        [b]: d.high,
+      });
+    } else {
+      const name = next();
+      const op = d.op === 'lt' ? '<' : d.op === 'gt' ? '>' : '=';
+      qb.andWhere(`${col} ${op} :${name}`, { [name]: d.at });
+    }
+  }
+}
 
 export async function findUrlByShortCode(
   shortCode: string,
@@ -47,19 +160,21 @@ export async function listUrls(params: {
   limit: number;
   active?: boolean;
   withDeleted?: boolean;
+  filters: UrlListRepoFilter;
 }): Promise<{ rows: Url[]; total: number }> {
   const repo = AppDataSource.getRepository(Url);
-  const where =
-    params.active === undefined ? {} : { isActive: params.active };
-
-  const [rows, total] = await repo.findAndCount({
-    where,
-    order: { createdAt: 'DESC' },
-    skip: (params.page - 1) * params.limit,
-    take: params.limit,
-    withDeleted: params.withDeleted === true,
-  });
-
+  const qb = repo.createQueryBuilder('url');
+  if (params.withDeleted === true) {
+    qb.withDeleted();
+  }
+  if (params.active !== undefined) {
+    qb.andWhere('url.isActive = :isActive', { isActive: params.active });
+  }
+  applyUrlListRepoFilters(qb, params.filters);
+  qb.orderBy('url.createdAt', 'DESC');
+  qb.skip((params.page - 1) * params.limit);
+  qb.take(params.limit);
+  const [rows, total] = await qb.getManyAndCount();
   return { rows, total };
 }
 
