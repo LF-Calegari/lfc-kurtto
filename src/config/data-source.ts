@@ -11,6 +11,8 @@ import { AddDeletedAtToUrls1744300800000 } from
   '../migrations/1744300800000-AddDeletedAtToUrls.js';
 import { UrlsShortCodePartialUniqueIndex1744500000000 } from
   '../migrations/1744500000000-UrlsShortCodePartialUniqueIndex.js';
+import { AddOwnerIdToUrls1744600000000 } from
+  '../migrations/1744600000000-AddOwnerIdToUrls.js';
 import { env } from './env.js';
 import { getIntegrationTestDatabaseUrl } from './test-database.js';
 
@@ -27,6 +29,7 @@ const jestMigrationClasses = [
   CreateUrlTable1744190400000,
   AddDeletedAtToUrls1744300800000,
   UrlsShortCodePartialUniqueIndex1744500000000,
+  AddOwnerIdToUrls1744600000000,
 ];
 
 const migrationPaths =

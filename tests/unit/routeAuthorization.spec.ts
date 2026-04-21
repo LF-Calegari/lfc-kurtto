@@ -80,31 +80,35 @@ describe('authorizeRoute', () => {
     });
   });
 
-  it('calls verify-token via GET Authorization header and allows granted route', async () => {
-    const fetchMock = jest
-      .fn()
-      .mockResolvedValue(okResponse(['CODE_X']));
-    jest.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
+  it(
+    'calls verify-token via GET Authorization header and allows granted route',
+    async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValue(okResponse(['CODE_X']));
+      jest.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
 
-    const { authorizeRoute } = await import('@middlewares/routeAuthorization');
-    const mw = authorizeRoute(
-      () => true,
-      () => 'CODE_X',
-    );
-    const next = jest.fn() as NextFunction;
+      const { authorizeRoute } =
+        await import('@middlewares/routeAuthorization');
+      const mw = authorizeRoute(
+        () => true,
+        () => 'CODE_X',
+      );
+      const next = jest.fn() as NextFunction;
 
-    await mw(baseReq(), {} as Response, next);
+      await mw(baseReq(), {} as Response, next);
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toContain('/api/v1/auth/verify-token');
-    expect(init?.method).toBe('GET');
-    expect(init?.headers).toMatchObject({
-      Authorization: 'Bearer t1',
-    });
-    expect(init?.body).toBeUndefined();
-    expect(next).toHaveBeenCalledWith();
-  });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(String(url)).toContain('/api/v1/auth/verify-token');
+      expect(init?.method).toBe('GET');
+      expect(init?.headers).toMatchObject({
+        Authorization: 'Bearer t1',
+      });
+      expect(init?.body).toBeUndefined();
+      expect(next).toHaveBeenCalledWith();
+    },
+  );
 
   it('returns 403 when required route code is not granted', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse(['OTHER']));
@@ -121,19 +125,25 @@ describe('authorizeRoute', () => {
     });
   });
 
-  it('allows when no route code is required (even with empty grants)', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse([]));
-    const { authorizeRoute } = await import('@middlewares/routeAuthorization');
-    const mw = authorizeRoute(() => true);
-    const next = jest.fn() as NextFunction;
-    await mw(baseReq(), {} as Response, next);
-    expect(next).toHaveBeenCalledWith();
-  });
+  it(
+    'allows when no route code is required (even with empty grants)',
+    async () => {
+      jest.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse([]));
+      const { authorizeRoute } =
+        await import('@middlewares/routeAuthorization');
+      const mw = authorizeRoute(() => true);
+      const next = jest.fn() as NextFunction;
+      await mw(baseReq(), {} as Response, next);
+      expect(next).toHaveBeenCalledWith();
+    },
+  );
 
   it('maps 401 from auth-service to Unauthorized', async () => {
     jest
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(null, { status: HttpStatusCode.UNAUTHORIZED }));
+      .mockResolvedValue(
+        new Response(null, { status: HttpStatusCode.UNAUTHORIZED }),
+      );
     const { authorizeRoute } = await import('@middlewares/routeAuthorization');
     const mw = authorizeRoute();
     const next = jest.fn() as NextFunction;
@@ -146,7 +156,9 @@ describe('authorizeRoute', () => {
   it('maps 403 from auth-service to Forbidden', async () => {
     jest
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(null, { status: HttpStatusCode.FORBIDDEN }));
+      .mockResolvedValue(
+        new Response(null, { status: HttpStatusCode.FORBIDDEN }),
+      );
     const { authorizeRoute } = await import('@middlewares/routeAuthorization');
     const mw = authorizeRoute();
     const next = jest.fn() as NextFunction;

@@ -637,7 +637,7 @@ describe('URL API and redirect', () => {
   );
 
   it(
-    'include_deleted chama verify-token via GET Authorization header (sem body)',
+    'include_deleted: verify-token via GET Authorization (sem body)',
     async () => {
       const fetchSpy = jest
         .spyOn(globalThis, 'fetch')

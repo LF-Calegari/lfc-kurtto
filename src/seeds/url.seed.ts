@@ -1,13 +1,14 @@
 import 'reflect-metadata';
 
 import { AppDataSource } from '../config/data-source.js';
+import { LEGACY_UNASSIGNED_OWNER_ID } from '../constants/urlOwnership.js';
 import { Url } from '../entities/Url.js';
 
 const expiredAt = new Date('2020-01-01T00:00:00.000Z');
 
 type UrlSeedRow = Pick<
   Url,
-  'originalUrl' | 'shortCode' | 'clicks' | 'isActive' | 'expiresAt'
+  'originalUrl' | 'shortCode' | 'clicks' | 'isActive' | 'expiresAt' | 'ownerId'
 >;
 
 const seedRows: UrlSeedRow[] = [
@@ -17,6 +18,7 @@ const seedRows: UrlSeedRow[] = [
     clicks: 0,
     isActive: true,
     expiresAt: null,
+    ownerId: LEGACY_UNASSIGNED_OWNER_ID,
   },
   {
     originalUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
@@ -24,6 +26,7 @@ const seedRows: UrlSeedRow[] = [
     clicks: 0,
     isActive: true,
     expiresAt: null,
+    ownerId: LEGACY_UNASSIGNED_OWNER_ID,
   },
   {
     originalUrl: 'https://www.google.com',
@@ -31,6 +34,7 @@ const seedRows: UrlSeedRow[] = [
     clicks: 0,
     isActive: true,
     expiresAt: null,
+    ownerId: LEGACY_UNASSIGNED_OWNER_ID,
   },
   {
     originalUrl: 'https://docs.example.com/kurtto',
@@ -38,6 +42,7 @@ const seedRows: UrlSeedRow[] = [
     clicks: 0,
     isActive: true,
     expiresAt: null,
+    ownerId: LEGACY_UNASSIGNED_OWNER_ID,
   },
   {
     originalUrl: 'https://expired.example.com',
@@ -45,6 +50,7 @@ const seedRows: UrlSeedRow[] = [
     clicks: 0,
     isActive: false,
     expiresAt: expiredAt,
+    ownerId: LEGACY_UNASSIGNED_OWNER_ID,
   },
 ];
 
