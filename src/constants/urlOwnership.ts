@@ -3,6 +3,8 @@
  * migração de backfill). Após a introdução do escopo por `owner_id`, esse
  * valor existe apenas para representar registros legados sem owner real.
  * Deve coincidir com o valor usado em `AddOwnerIdToUrls` (migração).
+ *
+ * @see docs/adr/0001-links-legados-owner-sentinel.md
  */
 export const LEGACY_UNASSIGNED_OWNER_ID =
   '00000000-0000-0000-0000-000000000001' as const;

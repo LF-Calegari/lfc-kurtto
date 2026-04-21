@@ -151,20 +151,26 @@ describe('URL API and redirect', () => {
     ).toBe(true);
   });
 
-  it('POST /api/v1/urls returns 422 when auth user id is legacy sentinel', async () => {
-    mockAuthServiceResponse(
-      HttpStatusCode.OK,
-      ALL_URL_ROUTE_CODES,
-      LEGACY_UNASSIGNED_OWNER_ID,
-    );
-    const res = await request(app).post('/api/v1/urls').set(authHeaders).send({
-      originalUrl: 'https://example.com/sentinel-owner',
-    });
-    expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
-    expect(
-      res.body.details.some((d: { field: string }) => d.field === 'ownerId'),
-    ).toBe(true);
-  });
+  it(
+    'POST /api/v1/urls returns 422 when auth user id is legacy sentinel',
+    async () => {
+      mockAuthServiceResponse(
+        HttpStatusCode.OK,
+        ALL_URL_ROUTE_CODES,
+        LEGACY_UNASSIGNED_OWNER_ID,
+      );
+      const res = await request(app)
+        .post('/api/v1/urls')
+        .set(authHeaders)
+        .send({
+          originalUrl: 'https://example.com/sentinel-owner',
+        });
+      expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+      expect(
+        res.body.details.some((d: { field: string }) => d.field === 'ownerId'),
+      ).toBe(true);
+    },
+  );
 
   it('GET /api/v1/urls returns paginated list with meta', async () => {
     const res = await request(app)

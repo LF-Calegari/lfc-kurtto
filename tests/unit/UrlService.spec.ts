@@ -19,6 +19,16 @@ const repoMocks = {
 
 jest.unstable_mockModule('@repositories/UrlRepository', () => repoMocks);
 
+const loggerMocks = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+};
+
+jest.unstable_mockModule('@config/logger', () => ({
+  logger: loggerMocks,
+}));
+
 const genMock = jest.fn();
 jest.unstable_mockModule('@utils/shortCode', () => ({
   generateShortCode: genMock,
@@ -124,6 +134,39 @@ describe('UrlService.list', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     repoMocks.listUrls.mockResolvedValue({ rows: [], total: 0 });
+  });
+
+  it('logs when list includes sentinel-owned URLs (legacy audit)', async () => {
+    repoMocks.listUrls.mockResolvedValue({
+      rows: [
+        makeSavedUrl({
+          ownerId: LEGACY_UNASSIGNED_OWNER_ID,
+          shortCode: 'leg01',
+        }),
+      ],
+      total: 1,
+    });
+    const { default: urlService } = await import('@services/UrlService');
+    await urlService.list(
+      {
+        page: 1,
+        limit: 10,
+        active: undefined,
+        is_active__exact: undefined,
+        include_deleted: undefined,
+      },
+      {
+        userId: '11111111-1111-1111-1111-111111111111',
+        isAdmin: true,
+      },
+    );
+    expect(loggerMocks.info).toHaveBeenCalledWith(
+      'legacy unassigned URL list',
+      expect.objectContaining({
+        context: 'url',
+        count: 1,
+      }),
+    );
   });
 
   it('maps query to repository filters and meta', async () => {
