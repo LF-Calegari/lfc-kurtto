@@ -5,10 +5,14 @@ import { AppDataSource } from '@config/data-source';
 import { env } from '@config/env';
 import { Url } from '@entities/Url';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
+import {
+  LEGACY_UNASSIGNED_OWNER_ID,
+} from '../../src/constants/urlOwnership.js';
 
 import app from '../../src/app.js';
 
 import {
+  ALL_URL_ROUTE_CODES,
   TEST_USER_B_ID,
   TEST_USER_ID,
   makeAuthServiceResponse,
@@ -146,6 +150,27 @@ describe('URL API and redirect', () => {
       res.body.details.some((d: { field: string }) => d.field === 'expiresAt'),
     ).toBe(true);
   });
+
+  it(
+    'POST /api/v1/urls returns 422 when auth user id is legacy sentinel',
+    async () => {
+      mockAuthServiceResponse(
+        HttpStatusCode.OK,
+        ALL_URL_ROUTE_CODES,
+        LEGACY_UNASSIGNED_OWNER_ID,
+      );
+      const res = await request(app)
+        .post('/api/v1/urls')
+        .set(authHeaders)
+        .send({
+          originalUrl: 'https://example.com/sentinel-owner',
+        });
+      expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+      expect(
+        res.body.details.some((d: { field: string }) => d.field === 'ownerId'),
+      ).toBe(true);
+    },
+  );
 
   it('GET /api/v1/urls returns paginated list with meta', async () => {
     const res = await request(app)
@@ -782,6 +807,125 @@ describe('URL API and redirect', () => {
     });
     const res = await request(app).get(`/api/v1/urls/${code}`).set(headersB);
     expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
+  });
+
+  it(
+    'admin enxerga link legado com owner sentinela e nao-admin nao',
+    async () => {
+      const repo = AppDataSource.getRepository(Url);
+      const code = `lg${Date.now().toString(36)}`.slice(0, 10);
+      await repo.save(
+        repo.create({
+          ownerId: LEGACY_UNASSIGNED_OWNER_ID,
+          originalUrl: 'https://legacy-visible.example.com',
+          shortCode: code,
+          clicks: 0,
+          isActive: true,
+          expiresAt: null,
+        }),
+      );
+
+      const adminList = await request(app)
+        .get(`/api/v1/urls?short_code__exact=${code}`)
+        .set(authHeaders);
+      expect(adminList.status).toBe(HttpStatusCode.OK);
+      expect(
+        adminList.body.data.some(
+          (row: { shortCode: string }) => row.shortCode === code,
+        ),
+      ).toBe(true);
+
+      const adminDetail = await request(app)
+        .get(`/api/v1/urls/${code}`)
+        .set(authHeaders);
+      expect(adminDetail.status).toBe(HttpStatusCode.OK);
+      expect(adminDetail.body.shortCode).toBe(code);
+
+      mockAuthServiceResponse(HttpStatusCode.OK, []);
+
+      const userList = await request(app)
+        .get(`/api/v1/urls?short_code__exact=${code}`)
+        .set(authHeaders);
+      expect(userList.status).toBe(HttpStatusCode.OK);
+      expect(
+        userList.body.data.some(
+          (row: { shortCode: string }) => row.shortCode === code,
+        ),
+      ).toBe(false);
+
+      const userDetail = await request(app)
+        .get(`/api/v1/urls/${code}`)
+        .set(authHeaders);
+      expect(userDetail.status).toBe(HttpStatusCode.NOT_FOUND);
+
+      const redirect = await request(app).get(`/${code}`).redirects(0);
+      expect(redirect.status).toBe(HttpStatusCode.FOUND);
+      expect(redirect.headers.location).toBe(
+        'https://legacy-visible.example.com',
+      );
+    },
+  );
+
+  it('apenas admin pode patch delete e restore de link legado', async () => {
+    const repo = AppDataSource.getRepository(Url);
+    const code = `lm${Date.now().toString(36)}`.slice(0, 10);
+    await repo.save(
+      repo.create({
+        ownerId: LEGACY_UNASSIGNED_OWNER_ID,
+        originalUrl: 'https://legacy-mutate.example.com',
+        shortCode: code,
+        clicks: 0,
+        isActive: true,
+        expiresAt: null,
+      }),
+    );
+
+    mockAuthServiceResponse(HttpStatusCode.OK, []);
+
+    const userPatch = await request(app)
+      .patch(`/api/v1/urls/${code}`)
+      .set(authHeaders)
+      .send({ originalUrl: 'https://blocked.example.com' });
+    expect(userPatch.status).toBe(HttpStatusCode.NOT_FOUND);
+
+    const userDelete = await request(app)
+      .delete(`/api/v1/urls/${code}`)
+      .set(authHeaders);
+    expect(userDelete.status).toBe(HttpStatusCode.NOT_FOUND);
+
+    mockAuthServiceResponse(HttpStatusCode.OK);
+
+    const adminPatch = await request(app)
+      .patch(`/api/v1/urls/${code}`)
+      .set(authHeaders)
+      .send({ originalUrl: 'https://legacy-patched.example.com' });
+    expect(adminPatch.status).toBe(HttpStatusCode.OK);
+    expect(adminPatch.body.originalUrl).toBe(
+      'https://legacy-patched.example.com',
+    );
+
+    const adminDelete = await request(app)
+      .delete(`/api/v1/urls/${code}`)
+      .set(authHeaders);
+    expect(adminDelete.status).toBe(HttpStatusCode.NO_CONTENT);
+
+    mockAuthServiceResponse(HttpStatusCode.OK, []);
+
+    const userRestore = await request(app)
+      .patch(`/api/v1/urls/${code}/restore`)
+      .set(authHeaders);
+    expect(userRestore.status).toBe(HttpStatusCode.NOT_FOUND);
+
+    mockAuthServiceResponse(HttpStatusCode.OK);
+
+    const adminRestore = await request(app)
+      .patch(`/api/v1/urls/${code}/restore`)
+      .set(authHeaders);
+    expect(adminRestore.status).toBe(HttpStatusCode.OK);
+    expect(adminRestore.body.deletedAt).toBeNull();
+    expect(adminRestore.body.originalUrl).toBe(
+      'https://legacy-patched.example.com',
+    );
   });
 
   it(
