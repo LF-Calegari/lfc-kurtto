@@ -10,6 +10,7 @@ import { HttpStatusCode } from '@utils/HttpStatusCode';
 
 import app from '../../src/app.js';
 
+import { mockAuthServiceResponse } from '../helpers/authServiceMock';
 import { useIntegrationDatabase } from '../helpers/setup';
 
 useIntegrationDatabase();
@@ -101,9 +102,7 @@ describe('health and errors', () => {
   });
 
   it('GET unknown route returns 404 contract', async () => {
-    const fetchSpy = jest
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(null, { status: HttpStatusCode.OK }));
+    const fetchSpy = mockAuthServiceResponse(HttpStatusCode.OK);
     try {
       const response = await request(app)
         .get('/api/v1/unknown')
