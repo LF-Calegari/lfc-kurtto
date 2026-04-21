@@ -142,9 +142,13 @@ describe('UrlService.resolveRedirect', () => {
     await expect(urlService.resolveRedirect('ex')).resolves.toEqual({
       outcome: 'gone_expired',
     });
-    expect(repoMocks.updateUrlByShortCode).toHaveBeenCalledWith('ex', {
-      isActive: false,
-    });
+    expect(repoMocks.updateUrlByShortCode).toHaveBeenCalledWith(
+      'ex',
+      {
+        isActive: false,
+      },
+      { kind: 'all' },
+    );
     expect(cacheMocks.delete).toHaveBeenCalledWith('ex');
   });
 });
@@ -162,14 +166,22 @@ describe('UrlService patch/remove cache', () => {
     const updated = makeUrl({ shortCode: 'p1' });
     repoMocks.updateUrlByShortCode.mockResolvedValue(updated);
     const { default: urlService } = await import('@services/UrlService');
-    await urlService.patch('p1', { originalUrl: 'https://new.example' });
+    await urlService.patch('p1', { originalUrl: 'https://new.example' }, {
+      userId: '11111111-1111-1111-1111-111111111111',
+      isAdmin: false,
+    });
     expect(cacheMocks.delete).toHaveBeenCalledWith('p1');
   });
 
   it('remove deletes cache after soft delete', async () => {
     repoMocks.softDeleteUrlByShortCode.mockResolvedValue(true);
     const { default: urlService } = await import('@services/UrlService');
-    await expect(urlService.remove('d1')).resolves.toBe(true);
+    await expect(
+      urlService.remove('d1', {
+        userId: '11111111-1111-1111-1111-111111111111',
+        isAdmin: false,
+      }),
+    ).resolves.toBe(true);
     expect(cacheMocks.delete).toHaveBeenCalledWith('d1');
   });
 });

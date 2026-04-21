@@ -26,11 +26,23 @@ import {
 import type {
   UrlDateFilterField,
   UrlListRepoFilter,
+  UrlOwnershipScope,
 } from '@repositories/UrlRepository';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
 import { generateShortCode } from '@utils/shortCode';
 
 const MAX_SHORT_CODE_ATTEMPTS = 5;
+
+export type UrlAccessActor = {
+  userId: string;
+  isAdmin: boolean;
+};
+
+function toOwnershipScope(actor: UrlAccessActor): UrlOwnershipScope {
+  return actor.isAdmin
+    ? { kind: 'all' }
+    : { kind: 'owner', ownerId: actor.userId };
+}
 
 function emptyUrlListRepoFilter(): UrlListRepoFilter {
   return { stringExact: [], stringLike: [], clicks: [], dates: [] };
@@ -172,12 +184,14 @@ export function serializeUrl(url: Url): Record<string, unknown> {
 }
 
 export class UrlService {
-  public async create(dto: CreateUrlDto): Promise<Url> {
+  public async create(dto: CreateUrlDto, ownerId: string): Promise<Url> {
     const expiresAt =
       dto.expiresAt === undefined ? null : new Date(dto.expiresAt);
 
     if (dto.customCode) {
-      const taken = await findUrlByShortCode(dto.customCode);
+      const taken = await findUrlByShortCode(dto.customCode, {
+        ownership: { kind: 'all' },
+      });
       if (taken) {
         throw new ConflictError();
       }
@@ -185,6 +199,7 @@ export class UrlService {
         originalUrl: dto.originalUrl,
         shortCode: dto.customCode,
         expiresAt,
+        ownerId,
       });
       const saved = await saveUrl(entity);
       logger.info('created with custom short_code', {
@@ -201,6 +216,7 @@ export class UrlService {
         originalUrl: dto.originalUrl,
         shortCode,
         expiresAt,
+        ownerId,
       });
       try {
         const saved = await saveUrl(entity);
@@ -231,7 +247,10 @@ export class UrlService {
     );
   }
 
-  public async list(query: ListUrlsQueryDto): Promise<{
+  public async list(
+    query: ListUrlsQueryDto,
+    actor: UrlAccessActor,
+  ): Promise<{
     data: ReturnType<typeof serializeUrl>[];
     meta: {
       page: number;
@@ -250,6 +269,7 @@ export class UrlService {
       active: isActiveFilter,
       withDeleted: query.include_deleted === true,
       filters: buildUrlListRepoFilter(query),
+      ownership: toOwnershipScope(actor),
     });
     const totalPages =
       total === 0 ? 0 : Math.ceil(total / query.limit);
@@ -266,9 +286,13 @@ export class UrlService {
 
   public async getByShortCode(
     shortCode: string,
+    actor: UrlAccessActor,
     options?: { withDeleted?: boolean },
   ): Promise<Url | null> {
-    return findUrlByShortCode(shortCode, options);
+    return findUrlByShortCode(shortCode, {
+      ...options,
+      ownership: toOwnershipScope(actor),
+    });
   }
 
   public async resolveRedirect(shortCode: string): Promise<RedirectResolution> {
@@ -301,7 +325,11 @@ export class UrlService {
     }
     const now = Date.now();
     if (url.expiresAt !== null && url.expiresAt.getTime() <= now) {
-      await updateUrlByShortCode(shortCode, { isActive: false });
+      await updateUrlByShortCode(
+        shortCode,
+        { isActive: false },
+        { kind: 'all' },
+      );
       await cacheService.delete(shortCode);
       return { outcome: 'gone_expired' };
     }
@@ -331,7 +359,11 @@ export class UrlService {
     });
   }
 
-  public async patch(shortCode: string, dto: PatchUrlDto): Promise<Url | null> {
+  public async patch(
+    shortCode: string,
+    dto: PatchUrlDto,
+    actor: UrlAccessActor,
+  ): Promise<Url | null> {
     const patch: {
       originalUrl?: string;
       expiresAt?: Date | null;
@@ -346,7 +378,11 @@ export class UrlService {
     if (dto.isActive !== undefined) {
       patch.isActive = dto.isActive;
     }
-    const updated = await updateUrlByShortCode(shortCode, patch);
+    const updated = await updateUrlByShortCode(
+      shortCode,
+      patch,
+      toOwnershipScope(actor),
+    );
     if (updated) {
       await cacheService.delete(shortCode);
       logger.info('patched', { context: 'url', shortCode, id: updated.id });
@@ -354,8 +390,14 @@ export class UrlService {
     return updated;
   }
 
-  public async remove(shortCode: string): Promise<boolean> {
-    const removed = await softDeleteUrlByShortCode(shortCode);
+  public async remove(
+    shortCode: string,
+    actor: UrlAccessActor,
+  ): Promise<boolean> {
+    const removed = await softDeleteUrlByShortCode(
+      shortCode,
+      toOwnershipScope(actor),
+    );
     if (removed) {
       await cacheService.delete(shortCode);
       logger.info('soft deleted', { context: 'url', shortCode });
@@ -363,8 +405,14 @@ export class UrlService {
     return removed;
   }
 
-  public async restore(shortCode: string): Promise<boolean> {
-    const restored = await restoreUrlByShortCode(shortCode);
+  public async restore(
+    shortCode: string,
+    actor: UrlAccessActor,
+  ): Promise<boolean> {
+    const restored = await restoreUrlByShortCode(
+      shortCode,
+      toOwnershipScope(actor),
+    );
     if (restored) {
       await cacheService.delete(shortCode);
       logger.info('restored from soft delete', { context: 'url', shortCode });

@@ -54,19 +54,30 @@ describe('UrlService.create', () => {
 
   it('persists URL with generated short code', async () => {
     const { default: urlService } = await import('@services/UrlService');
-    const row = await urlService.create({
-      originalUrl: 'https://example.com/x',
-    });
+    const row = await urlService.create(
+      {
+        originalUrl: 'https://example.com/x',
+      },
+      '11111111-1111-1111-1111-111111111111',
+    );
     expect(row.shortCode).toBe('abc1234');
+    expect(repoMocks.createUrlEntity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerId: '11111111-1111-1111-1111-111111111111',
+      }),
+    );
     expect(repoMocks.saveUrl).toHaveBeenCalled();
   });
 
   it('uses custom code when provided', async () => {
     const { default: urlService } = await import('@services/UrlService');
-    const row = await urlService.create({
-      originalUrl: 'https://example.com/y',
-      customCode: 'mycode',
-    });
+    const row = await urlService.create(
+      {
+        originalUrl: 'https://example.com/y',
+        customCode: 'mycode',
+      },
+      '11111111-1111-1111-1111-111111111111',
+    );
     expect(row.shortCode).toBe('mycode');
     expect(genMock).not.toHaveBeenCalled();
   });
@@ -84,9 +95,12 @@ describe('UrlService.create', () => {
     genMock.mockReturnValueOnce('dup1111').mockReturnValueOnce('uniq22');
 
     const { default: urlService } = await import('@services/UrlService');
-    const row = await urlService.create({
-      originalUrl: 'https://example.com/z',
-    });
+    const row = await urlService.create(
+      {
+        originalUrl: 'https://example.com/z',
+      },
+      '11111111-1111-1111-1111-111111111111',
+    );
     expect(row.shortCode).toBe('uniq22');
     expect(genMock).toHaveBeenCalledTimes(2);
   });
@@ -100,6 +114,10 @@ describe('UrlService.list', () => {
 
   it('maps query to repository filters and meta', async () => {
     const { default: urlService } = await import('@services/UrlService');
+    const adminActor = {
+      userId: '11111111-1111-1111-1111-111111111111',
+      isAdmin: true,
+    };
     const result = await urlService.list({
       page: 2,
       limit: 5,
@@ -132,7 +150,7 @@ describe('UrlService.list', () => {
       deleted_at__gt: '2000-01-01T00:00:00.000Z',
       deleted_at__exact: '2020-01-01T00:00:00.000Z',
       deleted_at__between: '2000-01-01T00:00:00.000Z,2099-01-01T00:00:00.000Z',
-    });
+    }, adminActor);
 
     expect(result.meta.page).toBe(2);
     expect(result.meta.limit).toBe(5);
@@ -144,6 +162,7 @@ describe('UrlService.list', () => {
         limit: 5,
         active: true,
         withDeleted: false,
+        ownership: { kind: 'all' },
         filters: expect.objectContaining({
           stringExact: expect.arrayContaining([
             { field: 'id', value: '550e8400-e29b-41d4-a716-446655440000' },
@@ -168,15 +187,19 @@ describe('UrlService.list', () => {
 
   it('uses is_active__exact over active when both are set', async () => {
     const { default: urlService } = await import('@services/UrlService');
+    const adminActor = {
+      userId: '11111111-1111-1111-1111-111111111111',
+      isAdmin: true,
+    };
     await urlService.list({
       page: 1,
       limit: 10,
       active: true,
       is_active__exact: false,
       include_deleted: undefined,
-    });
+    }, adminActor);
     expect(repoMocks.listUrls).toHaveBeenCalledWith(
-      expect.objectContaining({ active: false }),
+      expect.objectContaining({ active: false, ownership: { kind: 'all' } }),
     );
   });
 });
