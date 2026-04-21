@@ -74,6 +74,37 @@ Fluxo:
 - **Cache Redis**: a resposta de `verify-token` e cacheada por `AUTH_SERVICE_CACHE_TTL_SECONDS` (padrao `60`) usando a chave `auth:verify-token:<sha256(token)>`. Em testes (`NODE_ENV=test`) o TTL vai a `0` automaticamente. Defina `0` em outros ambientes se quiser desabilitar. Sem Redis configurado (`REDIS_URL` ausente), o cache e ignorado e cada request bate no auth-service.
 - **Timeouts e falhas**: `AUTH_SERVICE_TIMEOUT_MS` (padrao `5000`) delimita a chamada via `AbortController`. Os erros sao traduzidos para `401` (token invalido/expirado), `403` (sem permissao/routeCode), `502` (auth-service inalcancavel: DNS, conexao recusada, reset), `503` (auth-service retornou status/body inesperado) e `504` (timeout). Logs incluem `userId`, `code`, `method`, `path`, `errno`, `timeout`.
 
+## Estrategia para links legados sem owner real
+
+O `owner_id` foi introduzido depois de ja existirem linhas em `urls`. Para nao
+perder esses registros, a migration `AddOwnerIdToUrls` fez um **backfill**
+deterministico usando o UUID sentinela
+`00000000-0000-0000-0000-000000000001`
+(`LEGACY_UNASSIGNED_OWNER_ID`).
+
+Politica adotada:
+
+- **Backfill**: o sentinela existe apenas para representar dados legados sem
+  vinculo confiavel com uma identidade real. A API nao tenta adivinhar nem
+  reatribuir automaticamente um `owner_id` verdadeiro.
+- **Criacao nova**: requests autenticadas continuam gravando o `owner_id` real
+  vindo do `auth-service`; o sentinela nao deve ser tratado como owner normal.
+- **Visibilidade (`list` / `get`)**:
+  - administrador Kurtto (`isKurttoAdmin=true`) enxerga links legados;
+  - usuario comum enxerga apenas as linhas cujo `owner_id` e exatamente o seu;
+  - links com `LEGACY_UNASSIGNED_OWNER_ID` **nao** entram no escopo de usuario
+    comum e tambem nao podem ser "adotados" por coincidencia de UUID.
+- **Mutacoes (`patch` / `delete` / `restore`)**:
+  - administrador Kurtto pode operar links legados;
+  - usuario comum recebe o mesmo comportamento de recurso fora do seu escopo
+    (`404` / ausencia no `list`), sem revelar existencia do registro legado.
+- **Redirect publico**: `GET /:code` continua owner-agnostico. Se o link existir
+  e estiver ativo, redireciona normalmente, inclusive para registros legados.
+- **Observabilidade**: quando uma operacao autenticada de `list`, `get`,
+  `patch`, `delete` ou `restore` toca links com owner sentinela, o servico gera
+  log estruturado para facilitar auditoria operacional e eventual backfill
+  manual futuro.
+
 ## Documentacao interativa (Swagger)
 
 - **UI:** `GET /api/docs` (redireciona para `/api/docs/`) — Swagger UI com *Try it out*.

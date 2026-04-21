@@ -202,4 +202,40 @@ describe('UrlService.list', () => {
       expect.objectContaining({ active: false, ownership: { kind: 'all' } }),
     );
   });
+
+  it('never treats legacy sentinel as a normal owner scope', async () => {
+    const { default: urlService } = await import('@services/UrlService');
+    await urlService.list({
+      page: 1,
+      limit: 10,
+      active: undefined,
+      is_active__exact: undefined,
+      include_deleted: undefined,
+    }, {
+      userId: LEGACY_UNASSIGNED_OWNER_ID,
+      isAdmin: false,
+    });
+    expect(repoMocks.listUrls).toHaveBeenCalledWith(
+      expect.objectContaining({ ownership: { kind: 'none' } }),
+    );
+  });
+});
+
+describe('UrlService.getByShortCode', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    repoMocks.findUrlByShortCode.mockResolvedValue(null);
+  });
+
+  it('uses no-access scope for legacy sentinel actor', async () => {
+    const { default: urlService } = await import('@services/UrlService');
+    await urlService.getByShortCode('legacy01', {
+      userId: LEGACY_UNASSIGNED_OWNER_ID,
+      isAdmin: false,
+    });
+    expect(repoMocks.findUrlByShortCode).toHaveBeenCalledWith(
+      'legacy01',
+      expect.objectContaining({ ownership: { kind: 'none' } }),
+    );
+  });
 });

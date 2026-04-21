@@ -30,6 +30,7 @@ import type {
 } from '@repositories/UrlRepository';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
 import { generateShortCode } from '@utils/shortCode';
+import { isLegacyUnassignedOwnerId } from '../constants/urlOwnership.js';
 
 const MAX_SHORT_CODE_ATTEMPTS = 5;
 
@@ -39,9 +40,29 @@ export type UrlAccessActor = {
 };
 
 function toOwnershipScope(actor: UrlAccessActor): UrlOwnershipScope {
+  if (!actor.isAdmin && isLegacyUnassignedOwnerId(actor.userId)) {
+    return { kind: 'none' };
+  }
   return actor.isAdmin
     ? { kind: 'all' }
     : { kind: 'owner', ownerId: actor.userId };
+}
+
+function isLegacyUrl(url: Pick<Url, 'ownerId'>): boolean {
+  return isLegacyUnassignedOwnerId(url.ownerId);
+}
+
+function logLegacyUrlAction(
+  action: 'list' | 'get' | 'patch' | 'delete' | 'restore',
+  actor: UrlAccessActor,
+  meta: Record<string, unknown>,
+): void {
+  logger.info(`legacy unassigned URL ${action}`, {
+    context: 'url',
+    actorUserId: actor.userId,
+    actorIsAdmin: actor.isAdmin,
+    ...meta,
+  });
 }
 
 function emptyUrlListRepoFilter(): UrlListRepoFilter {
@@ -271,6 +292,13 @@ export class UrlService {
       filters: buildUrlListRepoFilter(query),
       ownership: toOwnershipScope(actor),
     });
+    const legacyCount = rows.filter((row) => isLegacyUrl(row)).length;
+    if (legacyCount > 0) {
+      logLegacyUrlAction('list', actor, {
+        count: legacyCount,
+        includeDeleted: query.include_deleted === true,
+      });
+    }
     const totalPages =
       total === 0 ? 0 : Math.ceil(total / query.limit);
     return {
@@ -289,10 +317,18 @@ export class UrlService {
     actor: UrlAccessActor,
     options?: { withDeleted?: boolean },
   ): Promise<Url | null> {
-    return findUrlByShortCode(shortCode, {
+    const url = await findUrlByShortCode(shortCode, {
       ...options,
       ownership: toOwnershipScope(actor),
     });
+    if (url && isLegacyUrl(url)) {
+      logLegacyUrlAction('get', actor, {
+        shortCode,
+        withDeleted: options?.withDeleted === true,
+        id: url.id,
+      });
+    }
+    return url;
   }
 
   public async resolveRedirect(shortCode: string): Promise<RedirectResolution> {
@@ -386,6 +422,12 @@ export class UrlService {
     if (updated) {
       await cacheService.delete(shortCode);
       logger.info('patched', { context: 'url', shortCode, id: updated.id });
+      if (isLegacyUrl(updated)) {
+        logLegacyUrlAction('patch', actor, {
+          shortCode,
+          id: updated.id,
+        });
+      }
     }
     return updated;
   }
@@ -394,6 +436,12 @@ export class UrlService {
     shortCode: string,
     actor: UrlAccessActor,
   ): Promise<boolean> {
+    const existing = await findUrlByShortCode(shortCode, {
+      ownership: toOwnershipScope(actor),
+    });
+    if (!existing) {
+      return false;
+    }
     const removed = await softDeleteUrlByShortCode(
       shortCode,
       toOwnershipScope(actor),
@@ -401,6 +449,12 @@ export class UrlService {
     if (removed) {
       await cacheService.delete(shortCode);
       logger.info('soft deleted', { context: 'url', shortCode });
+      if (isLegacyUrl(existing)) {
+        logLegacyUrlAction('delete', actor, {
+          shortCode,
+          id: existing.id,
+        });
+      }
     }
     return removed;
   }
@@ -409,6 +463,10 @@ export class UrlService {
     shortCode: string,
     actor: UrlAccessActor,
   ): Promise<boolean> {
+    const candidate = await findUrlByShortCode(shortCode, {
+      withDeleted: true,
+      ownership: toOwnershipScope(actor),
+    });
     const restored = await restoreUrlByShortCode(
       shortCode,
       toOwnershipScope(actor),
@@ -416,6 +474,12 @@ export class UrlService {
     if (restored) {
       await cacheService.delete(shortCode);
       logger.info('restored from soft delete', { context: 'url', shortCode });
+      if (candidate && isLegacyUrl(candidate)) {
+        logLegacyUrlAction('restore', actor, {
+          shortCode,
+          id: candidate.id,
+        });
+      }
     }
     return restored;
   }
