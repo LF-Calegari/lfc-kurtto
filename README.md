@@ -56,11 +56,23 @@ Fluxo:
 | `GET` | `/api/v1/health/ready` | Readiness: PostgreSQL acessivel; com `REDIS_URL` definido, Redis tambem deve responder (`200` ready ou `503` not_ready). |
 | `GET` | `/:code` | Redirecionamento publico para `original_url` (`302` + cache desabilitado; `404` / `410` conforme regras acima). |
 | `POST` | `/api/v1/urls` | Cria link encurtado (`201` com `short_url` a partir de `BASE_URL`; `409` se `custom_code` duplicado; `422` em validacao). |
-| `GET` | `/api/v1/urls` | Lista paginada (`page` padrao 1, `limit` padrao 10, max 100; `active` opcional `true`/`false`; filtros opcionais `campo__operador` em snake_case, ver OpenAPI em `GET /urls`; se `is_active__exact` e `active` forem enviados juntos, vale `is_active__exact`; `include_deleted=true` exige `Authorization: Bearer <token>` e validação no `auth-service`; `401` para token ausente/invalido e `403` para token sem permissão; meta `page`, `limit`, `total`, `total_pages`; ordenacao `created_at` DESC). |
-| `GET` | `/api/v1/urls/:code` | Detalhe por `short_code` (`200` ou `404`). `include_deleted=true` exige `Authorization: Bearer <token>` e validação no `auth-service`; `401` para token ausente/invalido e `403` sem permissão. Respostas incluem `deletedAt` (`null` ou ISO 8601). |
-| `PATCH` | `/api/v1/urls/:code` | Atualizacao parcial (sem `short_code`/`clicks`; `404` se inexistente ou soft-deleted). |
-| `DELETE` | `/api/v1/urls/:code` | Soft delete: preenche `deleted_at` (`204` ou `404`; segundo delete do mesmo codigo -> `404`). |
-| `PATCH` | `/api/v1/urls/:code/restore` | Remove soft delete (`200` + corpo URL; exige `Authorization: Bearer <token>` com autorização no `auth-service`; `401` token ausente/invalido; `403` sem permissão; `404` sem tumba; `422` se ja existe URL ativa com o codigo ou nao havia soft delete; restaura no maximo a tumba mais recente quando ha varias). |
+| `GET` | `/api/v1/urls` | Lista paginada (`page` padrao 1, `limit` padrao 10, max 100; `active` opcional `true`/`false`; filtros opcionais `campo__operador` em snake_case, ver OpenAPI em `GET /urls`; se `is_active__exact` e `active` forem enviados juntos, vale `is_active__exact`; **`include_deleted=true` exige `Authorization: Bearer <token>` validado no `auth-service` com routeCode `KURTTO_V1_URLS_LIST_INCLUDE_DELETED`**; `401` para token ausente/invalido, `403` para token sem permissão, `502`/`504` se o `auth-service` estiver inalcancavel ou lento; meta `page`, `limit`, `total`, `total_pages`; ordenacao `created_at` DESC). |
+| `GET` | `/api/v1/urls/:code` | Detalhe por `short_code` (`200` ou `404`). **`include_deleted=true` exige `Authorization: Bearer <token>` validado no `auth-service` com routeCode `KURTTO_V1_URLS_GET_BY_CODE_INCLUDE_DELETED`**; `401` token ausente/invalido, `403` sem permissão, `502`/`504` se o `auth-service` falhar. Respostas incluem `deletedAt` (`null` ou ISO 8601). |
+| `PATCH` | `/api/v1/urls/:code` | Atualizacao parcial (sem `short_code`/`clicks`; `404` se inexistente ou soft-deleted). **Publica, sem auth.** |
+| `DELETE` | `/api/v1/urls/:code` | Soft delete: preenche `deleted_at` (`204` ou `404`; segundo delete do mesmo codigo -> `404`). **Publica, sem auth.** |
+| `PATCH` | `/api/v1/urls/:code/restore` | Remove soft delete (`200` + corpo URL). **Exige `Authorization: Bearer <token>` com routeCode `KURTTO_V1_URLS_PATCH_RESTORE` no `auth-service`**; `401` token ausente/invalido; `403` sem permissão; `404` sem tumba; `422` se ja existe URL ativa com o codigo ou nao havia soft delete; `502`/`504` se o `auth-service` falhar; restaura no maximo a tumba mais recente quando ha varias. |
+
+## Autorizacao e integracao com o auth-service
+
+- **Contrato**: o kurtto-api valida Bearer JWT chamando `GET {AUTH_SERVICE_URL}{AUTH_SERVICE_VERIFY_TOKEN_PATH}` (padrao `/api/v1/auth/verify-token`) com `Authorization: Bearer <token>` e sem corpo. A resposta `200` traz `{ id, permissions, routeCodes }`, refletindo o contrato `VerifyTokenResponse` do auth-service.
+- **Decisao local**: para cada rota protegida, o middleware `authorizeRoute` verifica se o `routeCode` esperado da rota esta na lista `routeCodes` retornada. Se nao estiver, retorna `403`. Isso evita acoplar cada request especifica ao auth-service.
+- **Superficie protegida**: apenas 3 routeCodes existem no `KurttoAccessSeeder` do auth-service, e o kurtto-api respeita esse conjunto:
+  - `KURTTO_V1_URLS_LIST_INCLUDE_DELETED` - `GET /api/v1/urls?include_deleted=true`
+  - `KURTTO_V1_URLS_GET_BY_CODE_INCLUDE_DELETED` - `GET /api/v1/urls/:code?include_deleted=true`
+  - `KURTTO_V1_URLS_PATCH_RESTORE` - `PATCH /api/v1/urls/:code/restore`
+  - Demais mutacoes (`POST /urls`, `PATCH /:code`, `DELETE /:code`) sao publicas.
+- **Cache Redis**: a resposta de `verify-token` e cacheada por `AUTH_SERVICE_CACHE_TTL_SECONDS` (padrao `60`) usando a chave `auth:verify-token:<sha256(token)>`. Em testes (`NODE_ENV=test`) o TTL vai a `0` automaticamente. Defina `0` em outros ambientes se quiser desabilitar. Sem Redis configurado (`REDIS_URL` ausente), o cache e ignorado e cada request bate no auth-service.
+- **Timeouts e falhas**: `AUTH_SERVICE_TIMEOUT_MS` (padrao `5000`) delimita a chamada via `AbortController`. Os erros sao traduzidos para `401` (token invalido/expirado), `403` (sem permissao/routeCode), `502` (auth-service inalcancavel: DNS, conexao recusada, reset), `503` (auth-service retornou status/body inesperado) e `504` (timeout). Logs incluem `userId`, `code`, `method`, `path`, `errno`, `timeout`.
 
 ## Documentacao interativa (Swagger)
 

@@ -1,3 +1,4 @@
+import type { Request } from 'express';
 import { Router } from 'express';
 
 import urlController from '@controllers/UrlController';
@@ -7,14 +8,26 @@ import { validateBody } from '@middlewares/validate';
 import { CreateUrlSchema, PatchUrlSchema } from '../dtos/UrlDto.js';
 
 const urlRouter = Router();
+
+/**
+ * RouteCodes publicados pelo auth-service (ver `KurttoAccessSeeder` em
+ * lfc-calegari-sistemas/auth-service). Apenas as rotas "admin" abaixo
+ * exigem autorização:
+ * - listar/obter com `include_deleted=true`
+ * - reativar uma URL soft-deleted
+ * As demais (POST, PATCH update, DELETE soft) são públicas.
+ */
 const URL_ROUTE_CODES = {
-  CREATE: 'KURTTO_V1_URLS_POST_CREATE',
   RESTORE: 'KURTTO_V1_URLS_PATCH_RESTORE',
-  LIST: 'KURTTO_V1_URLS_GET_LIST',
-  GET_BY_CODE: 'KURTTO_V1_URLS_GET_BY_CODE',
-  UPDATE: 'KURTTO_V1_URLS_PATCH_UPDATE',
-  DELETE: 'KURTTO_V1_URLS_DELETE_BY_CODE',
+  LIST_INCLUDE_DELETED: 'KURTTO_V1_URLS_LIST_INCLUDE_DELETED',
+  GET_BY_CODE_INCLUDE_DELETED: 'KURTTO_V1_URLS_GET_BY_CODE_INCLUDE_DELETED',
 } as const;
+
+function includeDeletedRequested(req: Request): boolean {
+  const raw = req.query?.include_deleted;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return typeof value === 'string' && value.toLowerCase() === 'true';
+}
 
 /**
  * @swagger
@@ -52,7 +65,6 @@ const URL_ROUTE_CODES = {
  */
 urlRouter.post(
   '/',
-  authorizeRoute(() => true, () => URL_ROUTE_CODES.CREATE),
   postUrlsRateLimiter,
   validateBody(CreateUrlSchema),
   (req, res, next) => {
@@ -99,6 +111,8 @@ urlRouter.patch(
     void urlController.restore(req, res).catch(next);
   },
 );
+
+// --- rotas de leitura: auth somente quando include_deleted=true ---
 
 /**
  * @swagger
@@ -247,7 +261,10 @@ urlRouter.patch(
  */
 urlRouter.get(
   '/',
-  authorizeRoute(() => true, () => URL_ROUTE_CODES.LIST),
+  authorizeRoute(
+    includeDeletedRequested,
+    () => URL_ROUTE_CODES.LIST_INCLUDE_DELETED,
+  ),
   (req, res, next) => {
     void urlController.list(req, res).catch(next);
   },
@@ -291,7 +308,10 @@ urlRouter.get(
  */
 urlRouter.get(
   '/:code',
-  authorizeRoute(() => true, () => URL_ROUTE_CODES.GET_BY_CODE),
+  authorizeRoute(
+    includeDeletedRequested,
+    () => URL_ROUTE_CODES.GET_BY_CODE_INCLUDE_DELETED,
+  ),
   (req, res, next) => {
     void urlController.getByCode(req, res).catch(next);
   },
@@ -337,7 +357,6 @@ urlRouter.get(
  */
 urlRouter.patch(
   '/:code',
-  authorizeRoute(() => true, () => URL_ROUTE_CODES.UPDATE),
   validateBody(PatchUrlSchema),
   (req, res, next) => {
     void urlController.patch(req, res).catch(next);
@@ -368,7 +387,6 @@ urlRouter.patch(
  */
 urlRouter.delete(
   '/:code',
-  authorizeRoute(() => true, () => URL_ROUTE_CODES.DELETE),
   (req, res, next) => {
     void urlController.remove(req, res).catch(next);
   },
