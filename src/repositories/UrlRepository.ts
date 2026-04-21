@@ -1,8 +1,13 @@
-import type { SelectQueryBuilder } from 'typeorm';
+import type { FindOptionsWhere, SelectQueryBuilder } from 'typeorm';
 
 import { AppDataSource } from '@config/data-source';
 import { LEGACY_UNASSIGNED_OWNER_ID } from '../constants/urlOwnership.js';
 import { Url } from '@entities/Url';
+
+/** `all` = administrador Kurtto (sem filtro por proprietário). */
+export type UrlOwnershipScope =
+  | { kind: 'all' }
+  | { kind: 'owner'; ownerId: string };
 
 export type UrlStringFilterField = 'id' | 'originalUrl' | 'shortCode';
 
@@ -115,14 +120,25 @@ function applyUrlListRepoFilters(
   }
 }
 
+function whereForShortCode(
+  shortCode: string,
+  ownership: UrlOwnershipScope,
+): FindOptionsWhere<Url> {
+  if (ownership.kind === 'all') {
+    return { shortCode };
+  }
+  return { shortCode, ownerId: ownership.ownerId };
+}
+
 export async function findUrlByShortCode(
   shortCode: string,
-  options?: { withDeleted?: boolean },
+  options?: { withDeleted?: boolean; ownership?: UrlOwnershipScope },
 ): Promise<Url | null> {
   const repo = AppDataSource.getRepository(Url);
   const withDeleted = options?.withDeleted === true;
+  const ownership = options?.ownership ?? { kind: 'all' };
   return repo.findOne({
-    where: { shortCode },
+    where: whereForShortCode(shortCode, ownership),
     withDeleted,
     ...(withDeleted
       ? {
@@ -164,11 +180,17 @@ export async function listUrls(params: {
   active?: boolean;
   withDeleted?: boolean;
   filters: UrlListRepoFilter;
+  ownership: UrlOwnershipScope;
 }): Promise<{ rows: Url[]; total: number }> {
   const repo = AppDataSource.getRepository(Url);
   const qb = repo.createQueryBuilder('url');
   if (params.withDeleted === true) {
     qb.withDeleted();
+  }
+  if (params.ownership.kind === 'owner') {
+    qb.andWhere('url.ownerId = :ownerId', {
+      ownerId: params.ownership.ownerId,
+    });
   }
   if (params.active !== undefined) {
     qb.andWhere('url.isActive = :isActive', { isActive: params.active });
@@ -188,9 +210,12 @@ export async function updateUrlByShortCode(
     expiresAt?: Date | null;
     isActive?: boolean;
   },
+  ownership: UrlOwnershipScope,
 ): Promise<Url | null> {
   const repo = AppDataSource.getRepository(Url);
-  const existing = await repo.findOne({ where: { shortCode } });
+  const existing = await repo.findOne({
+    where: whereForShortCode(shortCode, ownership),
+  });
   if (!existing) {
     return null;
   }
@@ -208,9 +233,12 @@ export async function updateUrlByShortCode(
 
 export async function softDeleteUrlByShortCode(
   shortCode: string,
+  ownership: UrlOwnershipScope,
 ): Promise<boolean> {
   const repo = AppDataSource.getRepository(Url);
-  const existing = await repo.findOne({ where: { shortCode } });
+  const existing = await repo.findOne({
+    where: whereForShortCode(shortCode, ownership),
+  });
   if (!existing) {
     return false;
   }
@@ -225,17 +253,26 @@ export async function softDeleteUrlByShortCode(
  */
 export async function restoreUrlByShortCode(
   shortCode: string,
+  ownership: UrlOwnershipScope,
 ): Promise<boolean> {
   const repo = AppDataSource.getRepository(Url);
-  const active = await repo.findOne({ where: { shortCode } });
+  const active = await repo.findOne({
+    where: whereForShortCode(shortCode, ownership),
+  });
   if (active) {
     return false;
   }
-  const tombstone = await repo
+  const tombstoneQb = repo
     .createQueryBuilder('url')
     .withDeleted()
     .where('url.shortCode = :code', { code: shortCode })
-    .andWhere('url.deletedAt IS NOT NULL')
+    .andWhere('url.deletedAt IS NOT NULL');
+  if (ownership.kind === 'owner') {
+    tombstoneQb.andWhere('url.ownerId = :ownerId', {
+      ownerId: ownership.ownerId,
+    });
+  }
+  const tombstone = await tombstoneQb
     .orderBy('url.deletedAt', 'DESC')
     .getOne();
   if (!tombstone) {

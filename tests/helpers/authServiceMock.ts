@@ -3,11 +3,8 @@ import { jest } from '@jest/globals';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
 
 /**
- * Lista default de routeCodes que o mock do auth-service concede para o
- * usuário de teste. Reflete o seed real em `KurttoAccessSeeder` do
- * auth-service: apenas as operações "admin" são autorizadas por route
- * code; POST/PATCH/DELETE normais são públicos e não passam por
- * verify-token.
+ * Route codes do seed `KurttoAccessSeeder` no auth-service. Usuário com
+ * **todos** estes códigos é administrador Kurtto (sem filtro `owner_id`).
  */
 export const ALL_URL_ROUTE_CODES: ReadonlyArray<string> = Object.freeze([
   'KURTTO_V1_URLS_PATCH_RESTORE',
@@ -15,7 +12,10 @@ export const ALL_URL_ROUTE_CODES: ReadonlyArray<string> = Object.freeze([
   'KURTTO_V1_URLS_GET_BY_CODE_INCLUDE_DELETED',
 ]);
 
-export const TEST_USER_ID = '00000000-0000-0000-0000-000000000001';
+/** Identidade padrão dos testes de integração (não é o UUID legado sem dono). */
+export const TEST_USER_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+export const TEST_USER_B_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 /**
  * Monta um Response compatível com o que o auth-service devolveria em
@@ -25,11 +25,12 @@ export const TEST_USER_ID = '00000000-0000-0000-0000-000000000001';
 export function makeAuthServiceResponse(
   status: number,
   routeCodes: ReadonlyArray<string> = ALL_URL_ROUTE_CODES,
+  userId: string = TEST_USER_ID,
 ): Response {
   if (status === HttpStatusCode.OK) {
     return new Response(
       JSON.stringify({
-        id: TEST_USER_ID,
+        id: userId,
         permissions: [],
         routeCodes,
       }),
@@ -52,10 +53,15 @@ export function makeAuthServiceResponse(
 export function mockAuthServiceResponse(
   status: number,
   routeCodes?: ReadonlyArray<string>,
+  userId?: string,
 ): jest.SpiedFunction<typeof fetch> {
-  return jest
-    .spyOn(globalThis, 'fetch')
-    .mockImplementation(() =>
-      Promise.resolve(makeAuthServiceResponse(status, routeCodes)),
-    );
+  return jest.spyOn(globalThis, 'fetch').mockImplementation(() =>
+    Promise.resolve(
+      makeAuthServiceResponse(
+        status,
+        routeCodes ?? ALL_URL_ROUTE_CODES,
+        userId ?? TEST_USER_ID,
+      ),
+    ),
+  );
 }

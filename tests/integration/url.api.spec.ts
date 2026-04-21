@@ -9,7 +9,8 @@ import { HttpStatusCode } from '@utils/HttpStatusCode';
 import app from '../../src/app.js';
 
 import {
-  ALL_URL_ROUTE_CODES,
+  TEST_USER_B_ID,
+  TEST_USER_ID,
   makeAuthServiceResponse,
   mockAuthServiceResponse,
 } from '../helpers/authServiceMock';
@@ -52,11 +53,24 @@ const futureIso = (): string => {
 
 describe('URL API and redirect', () => {
   beforeEach(() => {
+    jest.restoreAllMocks();
     mockAuthServiceResponse(HttpStatusCode.OK);
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it('POST /api/v1/urls sem Bearer retorna 401', async () => {
+    const res = await request(app).post('/api/v1/urls').send({
+      originalUrl: 'https://example.com/no-auth',
+    });
+    expect(res.status).toBe(HttpStatusCode.UNAUTHORIZED);
+  });
+
+  it('GET /api/v1/urls sem Bearer retorna 401', async () => {
+    const res = await request(app).get('/api/v1/urls');
+    expect(res.status).toBe(HttpStatusCode.UNAUTHORIZED);
   });
 
   it('POST /api/v1/urls: generated short code (201)', async () => {
@@ -639,11 +653,7 @@ describe('URL API and redirect', () => {
   it(
     'include_deleted: verify-token via GET Authorization (sem body)',
     async () => {
-      const fetchSpy = jest
-        .spyOn(globalThis, 'fetch')
-        .mockImplementation(() =>
-          Promise.resolve(makeAuthServiceResponse(HttpStatusCode.OK)),
-        );
+      const fetchSpy = jest.spyOn(globalThis, 'fetch');
 
       const code = `mp${Date.now().toString(36)}`.slice(0, 10);
       const createRes = await request(app)
@@ -654,50 +664,125 @@ describe('URL API and redirect', () => {
           customCode: code,
         });
       expect(createRes.status).toBe(HttpStatusCode.CREATED);
-      // POST /urls é público agora; não deve ter tocado no auth-service.
-      expect(fetchSpy).toHaveBeenCalledTimes(0);
+      expect(fetchSpy).toHaveBeenCalled();
 
       const res = await request(app)
         .get(`/api/v1/urls/${code}?include_deleted=true`)
         .set(authHeaders);
       expect(res.status).toBe(HttpStatusCode.OK);
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
 
-      const [url, init] = fetchSpy.mock.calls[0];
+      const verifyCalls = fetchSpy.mock.calls.filter(([, init]) => {
+        const h = init?.headers as { Authorization?: string } | undefined;
+        return h?.Authorization === 'Bearer test-token';
+      });
+      expect(verifyCalls.length).toBeGreaterThanOrEqual(1);
+      const [url, init] = verifyCalls[verifyCalls.length - 1]!;
       expect(String(url)).toContain(env.AUTH_SERVICE_VERIFY_TOKEN_PATH);
       expect(init?.method).toBe('GET');
       expect(init?.body).toBeUndefined();
-      expect(init?.headers).toMatchObject({
-        Authorization: 'Bearer test-token',
-      });
     },
   );
 
   it(
-    'retorna 403 quando routeCode de include_deleted nao esta concedido',
+    'include_deleted: nao-admin lista proprias URLs soft-deleted',
     async () => {
-      mockAuthServiceResponse(
-        HttpStatusCode.OK,
-        ALL_URL_ROUTE_CODES.filter(
-          (c) => c !== 'KURTTO_V1_URLS_LIST_INCLUDE_DELETED',
-        ),
-      );
+      mockAuthServiceResponse(HttpStatusCode.OK, []);
+      const code = `nd${Date.now().toString(36)}`.slice(0, 10);
+      await request(app).post('/api/v1/urls').set(authHeaders).send({
+        originalUrl: 'https://non-admin-deleted.example.com',
+        customCode: code,
+      });
+      await request(app).delete(`/api/v1/urls/${code}`).set(authHeaders);
+
       const res = await request(app)
-        .get('/api/v1/urls?include_deleted=true')
+        .get('/api/v1/urls?include_deleted=true&limit=100')
         .set(authHeaders);
-      expect(res.status).toBe(HttpStatusCode.FORBIDDEN);
+      expect(res.status).toBe(HttpStatusCode.OK);
+      const found = res.body.data.find(
+        (row: { shortCode: string }) => row.shortCode === code,
+      );
+      expect(found).toBeTruthy();
     },
   );
 
   it(
-    'GET /urls (sem include_deleted) nao bate no auth-service',
+    'GET /urls com Bearer chama auth-service (verify-token)',
     async () => {
       const fetchSpy = jest.spyOn(globalThis, 'fetch');
-      const res = await request(app).get('/api/v1/urls');
+      const res = await request(app).get('/api/v1/urls').set(authHeaders);
       expect(res.status).toBe(HttpStatusCode.OK);
-      expect(fetchSpy).toHaveBeenCalledTimes(0);
+      expect(fetchSpy).toHaveBeenCalled();
     },
   );
+
+  it('admin Kurtto lista URL de outro proprietario', async () => {
+    const repo = AppDataSource.getRepository(Url);
+    const code = `ow${Date.now().toString(36)}`.slice(0, 10);
+    await repo.save(
+      repo.create({
+        ownerId: TEST_USER_B_ID,
+        originalUrl: 'https://foreign-owner.example.com',
+        shortCode: code,
+        clicks: 0,
+        isActive: true,
+        expiresAt: null,
+      }),
+    );
+    const res = await request(app)
+      .get(`/api/v1/urls?short_code__exact=${code}`)
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    expect(
+      res.body.data.some((r: { shortCode: string }) => r.shortCode === code),
+    ).toBe(true);
+  });
+
+  it('usuario nao-admin nao lista URL de outro proprietario', async () => {
+    mockAuthServiceResponse(HttpStatusCode.OK, []);
+    const repo = AppDataSource.getRepository(Url);
+    const code = `nf${Date.now().toString(36)}`.slice(0, 10);
+    await repo.save(
+      repo.create({
+        ownerId: TEST_USER_B_ID,
+        originalUrl: 'https://not-visible.example.com',
+        shortCode: code,
+        clicks: 0,
+        isActive: true,
+        expiresAt: null,
+      }),
+    );
+    const res = await request(app)
+      .get(`/api/v1/urls?short_code__exact=${code}`)
+      .set(authHeaders);
+    expect(res.status).toBe(HttpStatusCode.OK);
+    expect(
+      res.body.data.some((r: { shortCode: string }) => r.shortCode === code),
+    ).toBe(false);
+  });
+
+  it('usuario B nao obtem GET detalhe da URL do usuario A (404)', async () => {
+    jest.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
+      const auth = String(
+        (init?.headers as { Authorization?: string })?.Authorization ?? '',
+      );
+      const userId = auth.includes('kurtto-user-b')
+        ? TEST_USER_B_ID
+        : TEST_USER_ID;
+      return Promise.resolve(
+        makeAuthServiceResponse(HttpStatusCode.OK, [], userId),
+      );
+    });
+    const headersA = { Authorization: 'Bearer kurtto-user-a-token' };
+    const headersB = { Authorization: 'Bearer kurtto-user-b-token' };
+    const code = `ig${Date.now().toString(36)}`.slice(0, 10);
+    await request(app).post('/api/v1/urls').set(headersA).send({
+      originalUrl: 'https://idor-get.example.com',
+      customCode: code,
+    });
+    const res = await request(app).get(`/api/v1/urls/${code}`).set(headersB);
+    expect(res.status).toBe(HttpStatusCode.NOT_FOUND);
+  });
 
   it(
     'include_deleted retorna 502 quando auth-service inalcancavel',

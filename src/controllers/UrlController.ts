@@ -3,7 +3,9 @@ import { Request, Response } from 'express';
 import { AppError } from '@errors/AppError';
 import { NotFoundError } from '@errors/NotFoundError';
 import { ValidationError } from '@errors/ValidationError';
+import type { UrlAccessActor } from '@services/UrlService';
 import { HttpStatusCode } from '@utils/HttpStatusCode';
+import { isKurttoAdmin } from '@utils/kurttoAdmin';
 import {
   GetUrlByCodeQuerySchema,
   ListUrlsQuerySchema,
@@ -18,9 +20,21 @@ function routeParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? '') : value;
 }
 
+function urlActor(req: Request): UrlAccessActor {
+  const user = req.user;
+  if (!user) {
+    throw new AppError(
+      'Unauthorized: Bearer token is required.',
+      HttpStatusCode.UNAUTHORIZED,
+    );
+  }
+  return { userId: user.id, isAdmin: isKurttoAdmin(user) };
+}
+
 class UrlController {
   public async create(req: Request, res: Response): Promise<void> {
-    const url = await urlService.create(req.body);
+    const actor = urlActor(req);
+    const url = await urlService.create(req.body, actor.userId);
     res.status(HttpStatusCode.CREATED).json(serializeUrl(url));
   }
 
@@ -29,7 +43,7 @@ class UrlController {
     if (!parsed.success) {
       throw new ValidationError(zodErrorResponse(parsed.error));
     }
-    const result = await urlService.list(parsed.data);
+    const result = await urlService.list(parsed.data, urlActor(req));
     res.status(HttpStatusCode.OK).json(result);
   }
 
@@ -39,7 +53,7 @@ class UrlController {
     if (!q.success) {
       throw new ValidationError(zodErrorResponse(q.error));
     }
-    const url = await urlService.getByShortCode(code, {
+    const url = await urlService.getByShortCode(code, urlActor(req), {
       withDeleted: q.data.include_deleted === true,
     });
     if (!url) {
@@ -50,7 +64,7 @@ class UrlController {
 
   public async patch(req: Request, res: Response): Promise<void> {
     const code = routeParam(req.params.code);
-    const url = await urlService.patch(code, req.body);
+    const url = await urlService.patch(code, req.body, urlActor(req));
     if (!url) {
       throw new NotFoundError('URL not found');
     }
@@ -59,7 +73,7 @@ class UrlController {
 
   public async remove(req: Request, res: Response): Promise<void> {
     const code = routeParam(req.params.code);
-    const removed = await urlService.remove(code);
+    const removed = await urlService.remove(code, urlActor(req));
     if (!removed) {
       throw new NotFoundError('URL not found');
     }
@@ -68,9 +82,10 @@ class UrlController {
 
   public async restore(req: Request, res: Response): Promise<void> {
     const code = routeParam(req.params.code);
-    const restored = await urlService.restore(code);
+    const actor = urlActor(req);
+    const restored = await urlService.restore(code, actor);
     if (!restored) {
-      const active = await urlService.getByShortCode(code);
+      const active = await urlService.getByShortCode(code, actor);
       if (active) {
         throw new AppError(
           'URL is not soft-deleted',
@@ -79,7 +94,7 @@ class UrlController {
       }
       throw new NotFoundError('URL not found');
     }
-    const url = await urlService.getByShortCode(code);
+    const url = await urlService.getByShortCode(code, actor);
     if (!url) {
       throw new NotFoundError('URL not found');
     }
