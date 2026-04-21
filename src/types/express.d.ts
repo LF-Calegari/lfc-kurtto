@@ -1,5 +1,4 @@
-import type { AuthVerificationResult } from
-  '../services/AuthVerificationService.js';
+import type { AuthVerificationResult } from '@services/AuthVerificationService';
 
 declare global {
   namespace Express {
