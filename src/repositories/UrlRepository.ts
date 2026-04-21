@@ -7,6 +7,7 @@ import { Url } from '@entities/Url';
 /** `all` = administrador Kurtto (sem filtro por proprietário). */
 export type UrlOwnershipScope =
   | { kind: 'all' }
+  | { kind: 'none' }
   | { kind: 'owner'; ownerId: string };
 
 export type UrlStringFilterField = 'id' | 'originalUrl' | 'shortCode';
@@ -127,6 +128,9 @@ function whereForShortCode(
   if (ownership.kind === 'all') {
     return { shortCode };
   }
+  if (ownership.kind === 'none') {
+    return { shortCode, id: '__no-access__' };
+  }
   return { shortCode, ownerId: ownership.ownerId };
 }
 
@@ -137,6 +141,9 @@ export async function findUrlByShortCode(
   const repo = AppDataSource.getRepository(Url);
   const withDeleted = options?.withDeleted === true;
   const ownership = options?.ownership ?? { kind: 'all' };
+  if (ownership.kind === 'none') {
+    return null;
+  }
   return repo.findOne({
     where: whereForShortCode(shortCode, ownership),
     withDeleted,
@@ -182,6 +189,9 @@ export async function listUrls(params: {
   filters: UrlListRepoFilter;
   ownership: UrlOwnershipScope;
 }): Promise<{ rows: Url[]; total: number }> {
+  if (params.ownership.kind === 'none') {
+    return { rows: [], total: 0 };
+  }
   const repo = AppDataSource.getRepository(Url);
   const qb = repo.createQueryBuilder('url');
   if (params.withDeleted === true) {
@@ -212,6 +222,9 @@ export async function updateUrlByShortCode(
   },
   ownership: UrlOwnershipScope,
 ): Promise<Url | null> {
+  if (ownership.kind === 'none') {
+    return null;
+  }
   const repo = AppDataSource.getRepository(Url);
   const existing = await repo.findOne({
     where: whereForShortCode(shortCode, ownership),
@@ -235,6 +248,9 @@ export async function softDeleteUrlByShortCode(
   shortCode: string,
   ownership: UrlOwnershipScope,
 ): Promise<boolean> {
+  if (ownership.kind === 'none') {
+    return false;
+  }
   const repo = AppDataSource.getRepository(Url);
   const existing = await repo.findOne({
     where: whereForShortCode(shortCode, ownership),
@@ -255,6 +271,9 @@ export async function restoreUrlByShortCode(
   shortCode: string,
   ownership: UrlOwnershipScope,
 ): Promise<boolean> {
+  if (ownership.kind === 'none') {
+    return false;
+  }
   const repo = AppDataSource.getRepository(Url);
   const active = await repo.findOne({
     where: whereForShortCode(shortCode, ownership),

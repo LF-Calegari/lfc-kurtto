@@ -19,6 +19,16 @@ const repoMocks = {
 
 jest.unstable_mockModule('@repositories/UrlRepository', () => repoMocks);
 
+const loggerMocks = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+};
+
+jest.unstable_mockModule('@config/logger', () => ({
+  logger: loggerMocks,
+}));
+
 const genMock = jest.fn();
 jest.unstable_mockModule('@utils/shortCode', () => ({
   generateShortCode: genMock,
@@ -82,6 +92,20 @@ describe('UrlService.create', () => {
     expect(genMock).not.toHaveBeenCalled();
   });
 
+  it('rejects legacy sentinel owner id', async () => {
+    const { default: urlService } = await import('@services/UrlService');
+    const { ValidationError } = await import('@errors/ValidationError');
+    await expect(
+      urlService.create(
+        {
+          originalUrl: 'https://example.com/sentinel',
+        },
+        LEGACY_UNASSIGNED_OWNER_ID,
+      ),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repoMocks.saveUrl).not.toHaveBeenCalled();
+  });
+
   it('retries on unique collision then succeeds', async () => {
     const driverErr = Object.assign(new Error('dup'), { code: '23505' });
     const uniqueErr = new QueryFailedError('INSERT', [], driverErr);
@@ -110,6 +134,39 @@ describe('UrlService.list', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     repoMocks.listUrls.mockResolvedValue({ rows: [], total: 0 });
+  });
+
+  it('logs when list includes sentinel-owned URLs (legacy audit)', async () => {
+    repoMocks.listUrls.mockResolvedValue({
+      rows: [
+        makeSavedUrl({
+          ownerId: LEGACY_UNASSIGNED_OWNER_ID,
+          shortCode: 'leg01',
+        }),
+      ],
+      total: 1,
+    });
+    const { default: urlService } = await import('@services/UrlService');
+    await urlService.list(
+      {
+        page: 1,
+        limit: 10,
+        active: undefined,
+        is_active__exact: undefined,
+        include_deleted: undefined,
+      },
+      {
+        userId: '11111111-1111-1111-1111-111111111111',
+        isAdmin: true,
+      },
+    );
+    expect(loggerMocks.info).toHaveBeenCalledWith(
+      'legacy unassigned URL list',
+      expect.objectContaining({
+        context: 'url',
+        count: 1,
+      }),
+    );
   });
 
   it('maps query to repository filters and meta', async () => {
@@ -200,6 +257,42 @@ describe('UrlService.list', () => {
     }, adminActor);
     expect(repoMocks.listUrls).toHaveBeenCalledWith(
       expect.objectContaining({ active: false, ownership: { kind: 'all' } }),
+    );
+  });
+
+  it('never treats legacy sentinel as a normal owner scope', async () => {
+    const { default: urlService } = await import('@services/UrlService');
+    await urlService.list({
+      page: 1,
+      limit: 10,
+      active: undefined,
+      is_active__exact: undefined,
+      include_deleted: undefined,
+    }, {
+      userId: LEGACY_UNASSIGNED_OWNER_ID,
+      isAdmin: false,
+    });
+    expect(repoMocks.listUrls).toHaveBeenCalledWith(
+      expect.objectContaining({ ownership: { kind: 'none' } }),
+    );
+  });
+});
+
+describe('UrlService.getByShortCode', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    repoMocks.findUrlByShortCode.mockResolvedValue(null);
+  });
+
+  it('uses no-access scope for legacy sentinel actor', async () => {
+    const { default: urlService } = await import('@services/UrlService');
+    await urlService.getByShortCode('legacy01', {
+      userId: LEGACY_UNASSIGNED_OWNER_ID,
+      isAdmin: false,
+    });
+    expect(repoMocks.findUrlByShortCode).toHaveBeenCalledWith(
+      'legacy01',
+      expect.objectContaining({ ownership: { kind: 'none' } }),
     );
   });
 });
