@@ -1,4 +1,3 @@
-import type { Request } from 'express';
 import { Router } from 'express';
 
 import urlController from '@controllers/UrlController';
@@ -8,26 +7,6 @@ import { validateBody } from '@middlewares/validate';
 import { CreateUrlSchema, PatchUrlSchema } from '../dtos/UrlDto.js';
 
 const urlRouter = Router();
-
-/**
- * RouteCodes publicados pelo auth-service (ver `KurttoAccessSeeder` em
- * lfc-calegari-sistemas/auth-service). Apenas as rotas "admin" abaixo
- * exigem autorização:
- * - listar/obter com `include_deleted=true`
- * - reativar uma URL soft-deleted
- * As demais (POST, PATCH update, DELETE soft) são públicas.
- */
-const URL_ROUTE_CODES = {
-  RESTORE: 'KURTTO_V1_URLS_PATCH_RESTORE',
-  LIST_INCLUDE_DELETED: 'KURTTO_V1_URLS_LIST_INCLUDE_DELETED',
-  GET_BY_CODE_INCLUDE_DELETED: 'KURTTO_V1_URLS_GET_BY_CODE_INCLUDE_DELETED',
-} as const;
-
-function includeDeletedRequested(req: Request): boolean {
-  const raw = req.query?.include_deleted;
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  return typeof value === 'string' && value.toLowerCase() === 'true';
-}
 
 /**
  * @swagger
@@ -66,6 +45,7 @@ function includeDeletedRequested(req: Request): boolean {
 urlRouter.post(
   '/',
   postUrlsRateLimiter,
+  authorizeRoute(() => true),
   validateBody(CreateUrlSchema),
   (req, res, next) => {
     void urlController.create(req, res).catch(next);
@@ -106,13 +86,13 @@ urlRouter.post(
  */
 urlRouter.patch(
   '/:code/restore',
-  authorizeRoute(() => true, () => URL_ROUTE_CODES.RESTORE),
+  authorizeRoute(() => true),
   (req, res, next) => {
     void urlController.restore(req, res).catch(next);
   },
 );
 
-// --- rotas de leitura: auth somente quando include_deleted=true ---
+// --- leitura e mutação: Bearer obrigatório; escopo por owner no service ---
 
 /**
  * @swagger
@@ -261,10 +241,7 @@ urlRouter.patch(
  */
 urlRouter.get(
   '/',
-  authorizeRoute(
-    includeDeletedRequested,
-    () => URL_ROUTE_CODES.LIST_INCLUDE_DELETED,
-  ),
+  authorizeRoute(() => true),
   (req, res, next) => {
     void urlController.list(req, res).catch(next);
   },
@@ -308,10 +285,7 @@ urlRouter.get(
  */
 urlRouter.get(
   '/:code',
-  authorizeRoute(
-    includeDeletedRequested,
-    () => URL_ROUTE_CODES.GET_BY_CODE_INCLUDE_DELETED,
-  ),
+  authorizeRoute(() => true),
   (req, res, next) => {
     void urlController.getByCode(req, res).catch(next);
   },
@@ -357,6 +331,7 @@ urlRouter.get(
  */
 urlRouter.patch(
   '/:code',
+  authorizeRoute(() => true),
   validateBody(PatchUrlSchema),
   (req, res, next) => {
     void urlController.patch(req, res).catch(next);
@@ -387,6 +362,7 @@ urlRouter.patch(
  */
 urlRouter.delete(
   '/:code',
+  authorizeRoute(() => true),
   (req, res, next) => {
     void urlController.remove(req, res).catch(next);
   },
