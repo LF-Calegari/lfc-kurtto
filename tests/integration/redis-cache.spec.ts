@@ -155,6 +155,6 @@ describeRedis('Redis redirect cache', () => {
 
     const res = await request(app).get(`/${code}`).redirects(0);
     expect(res.status).toBe(HttpStatusCode.GONE);
-    expect(res.body.message).toBe('This short link has expired.');
+    expect(res.body.message).toBe('This link has expired');
   });
 });

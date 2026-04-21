@@ -18,6 +18,9 @@ export class Url {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  @Column({ name: 'owner_id', type: 'uuid' })
+  ownerId!: string;
+
   @Column({ name: 'original_url', type: 'text' })
   originalUrl!: string;
 
