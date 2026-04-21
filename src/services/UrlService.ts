@@ -214,7 +214,8 @@ export class UrlService {
           {
             field: 'ownerId',
             message:
-              'cannot use legacy unassigned owner id for new URLs (reserved for migrated rows)',
+              'cannot use legacy unassigned owner id for new URLs '
+              + '(reserved for migrated rows)',
           },
         ],
       });
