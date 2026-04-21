@@ -237,6 +237,7 @@ feature/<issue-number>/<descricao-curta>
 # 💬 Comentários e base de PR
 
 - Comentários em Issue/PR/review devem ser escritos sempre em **Markdown**.
+- **Fechamento automático da issue (obrigatório):** na **descrição da PR** (corpo ao abrir/atualizar o PR), inclua **sempre** uma linha no formato `Closes #<id>` (ex.: `Closes #60`), referenciando a issue implementada. Isso vincula a PR à issue e permite ao GitHub **fechar a issue automaticamente** quando o merge for integrado na branch padrão. Se houver várias issues resolvidas pela mesma PR, use uma linha por issue (`Closes #60`, `Closes #61`) ou o equivalente aceito pelo GitHub (`Closes #60, closes #61`). Não omita isso por “esquecimento”.
 - Toda PR deve ser aberta sempre com base na branch `development`.
   - Exemplo:
     ```bash
@@ -335,8 +336,10 @@ Você DEVE terminar com:
 ...
 
 ## 📦 PR pronto
+- Incluir na descrição da PR a linha **`Closes #<id>`** conforme seção *Comentários e base de PR*.
 
 ## 🔗 Issue relacionada
+- Número da issue e confirmação de que a descrição da PR contém `Closes #<id>`.
 ...
 
 ---
