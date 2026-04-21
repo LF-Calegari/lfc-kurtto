@@ -75,6 +75,7 @@ export function authorizeRoute(
         );
       }
 
+      req.user = result;
       next();
     } catch (error) {
       next(error);

@@ -110,20 +110,78 @@ describe('authorizeRoute', () => {
     },
   );
 
-  it('returns 403 when required route code is not granted', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse(['OTHER']));
+  it('populates req.user after successful verify', async () => {
+    const fetchMock = jest.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'user-abc',
+          permissions: ['p1'],
+          routeCodes: ['CODE_X'],
+        }),
+        {
+          status: HttpStatusCode.OK,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    );
+    jest.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
+
     const { authorizeRoute } = await import('@middlewares/routeAuthorization');
     const mw = authorizeRoute(
       () => true,
       () => 'CODE_X',
     );
     const next = jest.fn() as NextFunction;
-    await mw(baseReq(), {} as Response, next);
-    expect(next.mock.calls[0][0]).toMatchObject({
-      message: 'Forbidden: token has no permission for this route.',
-      statusCode: HttpStatusCode.FORBIDDEN,
+    const req = baseReq();
+
+    await mw(req, {} as Response, next);
+
+    expect(req.user).toEqual({
+      id: 'user-abc',
+      permissions: ['p1'],
+      routeCodes: ['CODE_X'],
     });
+    expect(next).toHaveBeenCalledWith();
   });
+
+  it('does not set req.user when shouldAuthorize returns false', async () => {
+    const fetchMock = jest.fn();
+    jest.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
+
+    const { authorizeRoute } = await import('@middlewares/routeAuthorization');
+    const mw = authorizeRoute(() => false);
+    const next = jest.fn() as NextFunction;
+    const req = baseReq();
+
+    await mw(req, {} as Response, next);
+
+    expect(req.user).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it(
+    'returns 403 without req.user when route code is not granted',
+    async () => {
+      jest.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse(['OTHER']));
+      const { authorizeRoute } =
+        await import('@middlewares/routeAuthorization');
+      const mw = authorizeRoute(
+        () => true,
+        () => 'CODE_X',
+      );
+      const next = jest.fn() as NextFunction;
+      const req = baseReq();
+
+      await mw(req, {} as Response, next);
+
+      expect(req.user).toBeUndefined();
+      expect(next.mock.calls[0][0]).toMatchObject({
+        message: 'Forbidden: token has no permission for this route.',
+        statusCode: HttpStatusCode.FORBIDDEN,
+      });
+    },
+  );
 
   it(
     'allows when no route code is required (even with empty grants)',
@@ -133,7 +191,13 @@ describe('authorizeRoute', () => {
         await import('@middlewares/routeAuthorization');
       const mw = authorizeRoute(() => true);
       const next = jest.fn() as NextFunction;
-      await mw(baseReq(), {} as Response, next);
+      const req = baseReq();
+      await mw(req, {} as Response, next);
+      expect(req.user).toEqual({
+        id: 'test-user',
+        permissions: [],
+        routeCodes: [],
+      });
       expect(next).toHaveBeenCalledWith();
     },
   );
