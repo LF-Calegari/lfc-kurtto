@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { QueryFailedError } from 'typeorm';
 
 import type { Url } from '@entities/Url';
+import {
+  LEGACY_UNASSIGNED_OWNER_ID,
+} from '../../src/constants/urlOwnership.js';
 
 const repoMocks = {
   findUrlByShortCode: jest.fn(),
@@ -24,6 +27,7 @@ jest.unstable_mockModule('@utils/shortCode', () => ({
 function makeSavedUrl(partial: Partial<Url>): Url {
   return {
     id: 'id-1',
+    ownerId: partial.ownerId ?? LEGACY_UNASSIGNED_OWNER_ID,
     originalUrl: partial.originalUrl ?? 'https://example.com',
     shortCode: partial.shortCode ?? 'abc',
     clicks: 0,

@@ -1,6 +1,7 @@
 import type { SelectQueryBuilder } from 'typeorm';
 
 import { AppDataSource } from '@config/data-source';
+import { LEGACY_UNASSIGNED_OWNER_ID } from '../constants/urlOwnership.js';
 import { Url } from '@entities/Url';
 
 export type UrlStringFilterField = 'id' | 'originalUrl' | 'shortCode';
@@ -144,6 +145,7 @@ export function createUrlEntity(partial: {
   originalUrl: string;
   shortCode: string;
   expiresAt: Date | null;
+  ownerId?: string;
 }): Url {
   const repo = AppDataSource.getRepository(Url);
   return repo.create({
@@ -152,6 +154,7 @@ export function createUrlEntity(partial: {
     clicks: 0,
     isActive: true,
     expiresAt: partial.expiresAt,
+    ownerId: partial.ownerId ?? LEGACY_UNASSIGNED_OWNER_ID,
   });
 }
 

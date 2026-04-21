@@ -8,6 +8,7 @@ import { HttpStatusCode } from '@utils/HttpStatusCode';
 
 import app from '../../src/app.js';
 
+import { mockAuthServiceResponse } from '../helpers/authServiceMock';
 import { useIntegrationDatabase } from '../helpers/setup';
 
 useIntegrationDatabase();
@@ -16,9 +17,7 @@ const authHeaders = { Authorization: 'Bearer test-token' };
 
 describe('security middleware', () => {
   beforeEach(() => {
-    jest
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(null, { status: HttpStatusCode.OK }));
+    mockAuthServiceResponse(HttpStatusCode.OK);
   });
 
   afterEach(() => {

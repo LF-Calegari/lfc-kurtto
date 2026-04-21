@@ -8,17 +8,16 @@ import { HttpStatusCode } from '@utils/HttpStatusCode';
 
 import app from '../../src/app.js';
 
+import {
+  ALL_URL_ROUTE_CODES,
+  makeAuthServiceResponse,
+  mockAuthServiceResponse,
+} from '../helpers/authServiceMock';
 import { useIntegrationDatabase } from '../helpers/setup';
 
 useIntegrationDatabase();
 
 const authHeaders = { Authorization: 'Bearer test-token' };
-
-function mockAuthServiceResponse(status: number): void {
-  jest
-    .spyOn(globalThis, 'fetch')
-    .mockResolvedValue(new Response(null, { status }));
-}
 
 function mockAuthServiceUnavailable(): void {
   jest
@@ -638,58 +637,76 @@ describe('URL API and redirect', () => {
   );
 
   it(
-    'rotas enviam codigo unico e method/path para auth-service',
+    'include_deleted: verify-token via GET Authorization (sem body)',
     async () => {
       const fetchSpy = jest
         .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(new Response(null, { status: HttpStatusCode.OK }));
+        .mockImplementation(() =>
+          Promise.resolve(makeAuthServiceResponse(HttpStatusCode.OK)),
+        );
 
       const code = `mp${Date.now().toString(36)}`.slice(0, 10);
-      await request(app).post('/api/v1/urls').set(authHeaders).send({
-        originalUrl: 'https://method-path.example.com',
-        customCode: code,
-      });
+      const createRes = await request(app)
+        .post('/api/v1/urls')
+        .set(authHeaders)
+        .send({
+          originalUrl: 'https://method-path.example.com',
+          customCode: code,
+        });
+      expect(createRes.status).toBe(HttpStatusCode.CREATED);
+      // POST /urls é público agora; não deve ter tocado no auth-service.
+      expect(fetchSpy).toHaveBeenCalledTimes(0);
 
       const res = await request(app)
         .get(`/api/v1/urls/${code}?include_deleted=true`)
         .set(authHeaders);
       expect(res.status).toBe(HttpStatusCode.OK);
-      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
 
-      const [, postInit] = fetchSpy.mock.calls[0];
-      expect(postInit?.body).toBe(
-        JSON.stringify({
-          code: 'KURTTO_V1_URLS_POST_CREATE',
-          method: 'POST',
-          path: '/api/v1/urls',
-        }),
-      );
-
-      const [url, getInit] = fetchSpy.mock.calls[1];
-      expect(String(url)).toContain(env.AUTH_SERVICE_AUTHORIZE_ROUTE_PATH);
-      expect(getInit?.method).toBe('POST');
-      expect(getInit?.headers).toMatchObject({
+      const [url, init] = fetchSpy.mock.calls[0];
+      expect(String(url)).toContain(env.AUTH_SERVICE_VERIFY_TOKEN_PATH);
+      expect(init?.method).toBe('GET');
+      expect(init?.body).toBeUndefined();
+      expect(init?.headers).toMatchObject({
         Authorization: 'Bearer test-token',
-        'Content-Type': 'application/json',
       });
-      expect(getInit?.body).toBe(
-        JSON.stringify({
-          code: 'KURTTO_V1_URLS_GET_BY_CODE',
-          method: 'GET',
-          path: '/api/v1/urls/:code',
-        }),
-      );
     },
   );
 
   it(
-    'include_deleted retorna 503 quando auth-service indisponivel',
+    'retorna 403 quando routeCode de include_deleted nao esta concedido',
+    async () => {
+      mockAuthServiceResponse(
+        HttpStatusCode.OK,
+        ALL_URL_ROUTE_CODES.filter(
+          (c) => c !== 'KURTTO_V1_URLS_LIST_INCLUDE_DELETED',
+        ),
+      );
+      const res = await request(app)
+        .get('/api/v1/urls?include_deleted=true')
+        .set(authHeaders);
+      expect(res.status).toBe(HttpStatusCode.FORBIDDEN);
+    },
+  );
+
+  it(
+    'GET /urls (sem include_deleted) nao bate no auth-service',
+    async () => {
+      const fetchSpy = jest.spyOn(globalThis, 'fetch');
+      const res = await request(app).get('/api/v1/urls');
+      expect(res.status).toBe(HttpStatusCode.OK);
+      expect(fetchSpy).toHaveBeenCalledTimes(0);
+    },
+  );
+
+  it(
+    'include_deleted retorna 502 quando auth-service inalcancavel',
     async () => {
       mockAuthServiceUnavailable();
       const res = await request(app)
         .get('/api/v1/urls?include_deleted=true')
         .set(authHeaders);
-      expect(res.status).toBe(HttpStatusCode.SERVICE_UNAVAILABLE);
+      expect(res.status).toBe(HttpStatusCode.BAD_GATEWAY);
     },
   );
 
