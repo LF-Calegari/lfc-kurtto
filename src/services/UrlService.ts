@@ -5,6 +5,7 @@ import { logger } from '@config/logger';
 import cacheService from '@services/CacheService';
 import { AppError } from '@errors/AppError';
 import { ConflictError } from '@errors/ConflictError';
+import { ValidationError } from '@errors/ValidationError';
 import {
   type CreateUrlDto,
   type ListUrlsQueryDto,
@@ -206,6 +207,19 @@ export function serializeUrl(url: Url): Record<string, unknown> {
 
 export class UrlService {
   public async create(dto: CreateUrlDto, ownerId: string): Promise<Url> {
+    if (isLegacyUnassignedOwnerId(ownerId)) {
+      throw new ValidationError({
+        error: 'Validation failed',
+        details: [
+          {
+            field: 'ownerId',
+            message:
+              'cannot use legacy unassigned owner id for new URLs (reserved for migrated rows)',
+          },
+        ],
+      });
+    }
+
     const expiresAt =
       dto.expiresAt === undefined ? null : new Date(dto.expiresAt);
 

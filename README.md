@@ -87,8 +87,10 @@ Politica adotada:
 - **Backfill**: o sentinela existe apenas para representar dados legados sem
   vinculo confiavel com uma identidade real. A API nao tenta adivinhar nem
   reatribuir automaticamente um `owner_id` verdadeiro.
-- **Criacao nova**: requests autenticadas continuam gravando o `owner_id` real
-  vindo do `auth-service`; o sentinela nao deve ser tratado como owner normal.
+- **Criacao nova**: requests autenticadas gravam o `owner_id` real vindo do
+  `auth-service`. Se esse id for o UUID sentinela (erro operacional ou
+  identidade invalida), a API responde **`422`** e nao persiste — o sentinela e
+  exclusivo do backfill legado, nao de novas linhas.
 - **Visibilidade (`list` / `get`)**:
   - administrador Kurtto (`isKurttoAdmin=true`) enxerga links legados;
   - usuario comum enxerga apenas as linhas cujo `owner_id` e exatamente o seu;

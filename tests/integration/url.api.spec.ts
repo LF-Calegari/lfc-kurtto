@@ -12,6 +12,7 @@ import {
 import app from '../../src/app.js';
 
 import {
+  ALL_URL_ROUTE_CODES,
   TEST_USER_B_ID,
   TEST_USER_ID,
   makeAuthServiceResponse,
@@ -147,6 +148,21 @@ describe('URL API and redirect', () => {
     expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
     expect(
       res.body.details.some((d: { field: string }) => d.field === 'expiresAt'),
+    ).toBe(true);
+  });
+
+  it('POST /api/v1/urls returns 422 when auth user id is legacy sentinel', async () => {
+    mockAuthServiceResponse(
+      HttpStatusCode.OK,
+      ALL_URL_ROUTE_CODES,
+      LEGACY_UNASSIGNED_OWNER_ID,
+    );
+    const res = await request(app).post('/api/v1/urls').set(authHeaders).send({
+      originalUrl: 'https://example.com/sentinel-owner',
+    });
+    expect(res.status).toBe(HttpStatusCode.UNPROCESSABLE_ENTITY);
+    expect(
+      res.body.details.some((d: { field: string }) => d.field === 'ownerId'),
     ).toBe(true);
   });
 

@@ -82,6 +82,20 @@ describe('UrlService.create', () => {
     expect(genMock).not.toHaveBeenCalled();
   });
 
+  it('rejects legacy sentinel owner id', async () => {
+    const { default: urlService } = await import('@services/UrlService');
+    const { ValidationError } = await import('@errors/ValidationError');
+    await expect(
+      urlService.create(
+        {
+          originalUrl: 'https://example.com/sentinel',
+        },
+        LEGACY_UNASSIGNED_OWNER_ID,
+      ),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repoMocks.saveUrl).not.toHaveBeenCalled();
+  });
+
   it('retries on unique collision then succeeds', async () => {
     const driverErr = Object.assign(new Error('dup'), { code: '23505' });
     const uniqueErr = new QueryFailedError('INSERT', [], driverErr);
