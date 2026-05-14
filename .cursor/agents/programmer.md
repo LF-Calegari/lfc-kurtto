@@ -155,6 +155,11 @@ Substitua pelo script real do `package.json` (ex.: `migration:run`, `typeorm:mig
 - Criar ou ajustar testes (Jest, Vitest, Node test runner, etc., conforme o projeto)
 - Priorizar integração quando houver múltiplas camadas ou PostgreSQL
 - Executar checagens e testes obrigatoriamente via Docker usando imagens compatíveis com o projeto (versão de Node, banco e serviços do `docker-compose.yml`)
+- Aplicar **property-based testing** quando houver regras com espaço grande de entradas (parsers, filtros, ordenação, normalização, validações, serialização, limites numéricos/datas, contratos de transformação):
+  - usar geradores aleatórios com semente reprodutível;
+  - definir invariantes explícitos (ex.: "nunca quebra contrato", "sempre retorna valor válido", "ordenação é estável", "round-trip mantém equivalência");
+  - incluir pelo menos 1 caso de propriedade por fluxo crítico quando fizer sentido técnico;
+  - se não aplicar property-based em uma alteração elegível, justificar em **Riscos/Pendências**.
 - Cobrir:
   - fluxo principal
   - erro
@@ -176,6 +181,49 @@ Você DEVE avaliar impacto de segurança:
 - erros
 
 Se houver risco, mitigar ou documentar.
+
+---
+
+# 🧮 Detector de N+1 (obrigatório em mudanças de API/DB)
+
+Para qualquer issue que altere endpoint HTTP, service/repository, ORM, query SQL ou relacionamento de dados:
+
+- Implementar (ou manter ativo) um **hook de observabilidade por request** para contar queries ao banco.
+- O hook deve usar o stack atual do projeto (**TypeORM + logger da aplicação**).  
+  - **Não usar `log4j`/`log4js`** neste projeto; manter padrão com o logger já adotado.
+- Quando uma request ultrapassar **15 queries**, registrar **log estruturado** no nível `warn` (ou `error` se houver degradação crítica) com no mínimo:
+  - `context` (ex.: `n+1-detector`)
+  - método HTTP
+  - rota/path
+  - `queryCount`
+  - `userId` quando disponível (`req.user.id`)
+  - `requestId`/correlation id quando disponível
+- Se o detector identificar request acima do limite durante testes de integração/homologação:
+  - criar uma **GitHub Issue** para revisão da implementação/performance;
+  - título sugerido: `perf: investigar possível N+1 em <metodo> <rota>`;
+  - incluir evidências (trecho de log, endpoint, branch/PR, hipótese de causa, impacto);
+  - referenciar a PR atual no corpo da issue.
+- Essa issue de performance deve ser citada em **Riscos/Pendências** da saída final quando não for corrigida na mesma PR.
+
+---
+
+# 🧠 Detector de Memory Leak (obrigatório em mudanças de runtime)
+
+Para qualquer issue que altere ciclo de vida de objetos, timers, listeners, streams, cache em memória, filas, workers ou middlewares:
+
+- Avaliar risco de **memory leak** explicitamente na implementação e na revisão.
+- Garantir teardown/cleanup de recursos:
+  - `setInterval` / `setTimeout` com `clear*` adequado (e `unref()` quando aplicável);
+  - listeners/event emitters removidos ao final do ciclo;
+  - conexões/streams fechadas corretamente;
+  - caches com política de limite (TTL/LRU/max size), evitando crescimento infinito.
+- Em testes automatizados, incluir ao menos uma validação de estabilidade quando aplicável:
+  - repetir fluxo crítico em loop controlado e verificar ausência de crescimento anormal de memória/handles;
+  - quando houver sinais de vazamento, rodar investigação com `--detectOpenHandles` e/ou instrumentação de heap.
+- Se identificar possível leak (mesmo sem correção imediata):
+  - registrar log estruturado com contexto técnico suficiente para diagnóstico;
+  - abrir **GitHub Issue** de investigação/correção (ex.: `perf: investigar possível memory leak em <componente/rota>`), com evidências;
+  - referenciar a PR atual e listar em **Riscos/Pendências**.
 
 ---
 
