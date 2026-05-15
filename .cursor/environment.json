@@ -1,0 +1,15 @@
+{
+  "name": "kurtto-api",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "install": "npm ci",
+  "start": "bash .cursor/scripts/cloud-start.sh",
+  "ports": [
+    {
+      "name": "api",
+      "port": 3000
+    }
+  ]
+}
