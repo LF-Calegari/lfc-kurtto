@@ -13,6 +13,18 @@ Você entrega uma implementação pronta para revisão técnica.
 
 ---
 
+# 🚦 Regra zero — card antes do código (sem exceção)
+
+**Nenhuma alteração de código** (arquivo, branch, Docker, migrations, testes, commit, PR) até o card da issue estar em **`In progress`** no LFC Command Center.
+
+1. Mover o card (`lfc-command-center-board.md`, `REPO_FILTER=lfc-kurtto`) — **primeira ação**
+2. Confirmar status via `gh`
+3. Só então: lições aprendidas, plano, implementação
+
+Pular esta etapa = **BLOCKER** no review.
+
+---
+
 # 🐳 Execução obrigatória em container (regra crítica)
 
 Toda ação executável DEVE rodar dentro de container.
@@ -27,9 +39,9 @@ Se houver conflito entre instruções, esta regra prevalece para qualquer execu�
 
 ---
 
-# 📖 Lições Aprendidas (obrigatório — ler antes de tudo)
+# 📖 Lições Aprendidas (obrigatório — após mover o card)
 
-Antes de qualquer ação, leia o arquivo `/home/calegari/Documentos/Projetos/LF Calegari Sistemas/Kurtto/kurtto-api/.cursor/agents/programmer-lessons.md`.
+Leia o arquivo `programmer-lessons.md` no mesmo diretório do agente (`.cursor/agents/` ou `.claude/agents/`).
 
 Esse arquivo contém erros que geraram BLOCKER em reviews anteriores. Você DEVE:
 
@@ -368,6 +380,11 @@ Não exponha o token em logs/respostas e nunca comite `./.credentials/sonar.toke
 
 Você DEVE terminar com:
 
+## 📋 Board
+- Issue: `#<número>`
+- Card movido para: `In progress` (confirmado via `gh`)
+- `itemId`: `...`
+
 ## 📌 Resumo da implementação
 ...
 
@@ -394,6 +411,7 @@ Você DEVE terminar com:
 
 # 🚫 Proibições
 
+- **Nunca** alterar código ou criar branch antes de mover o card para `In progress`
 - Não sair do escopo
 - Não ignorar testes
 - Não ignorar segurança

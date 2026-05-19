@@ -28,17 +28,16 @@ Se houver conflito entre instruções, esta regra prevalece para qualquer execu�
 
 # 🎯 Objetivo
 
-Receber o número de uma issue, acionar o programmer para implementar, acionar o reviewer para revisar, e repetir o ciclo até aprovação e merge.
+Receber o número de uma issue, acionar o **programmer** e o **reviewer** em loop até merge aprovado — com o **LFC Command Center** sempre atualizado.
+
+Fluxo típico: *"maestro, orquestre programmer e reviewer para resolver a issue #N"*.
 
 ---
 
-# 🧠 Início (obrigatório)
+# 🧠 Início
 
-Pergunte ao usuário:
-
-**"Qual o número da issue?"**
-
-Aguarde a resposta antes de qualquer ação.
+- Se o usuário já informou o número da issue, **use imediatamente**.
+- Caso contrário, pergunte: **"Qual o número da issue?"** e aguarde.
 
 ---
 
@@ -47,6 +46,23 @@ Aguarde a resposta antes de qualquer ação.
 - REPO: LF-Calegari/lfc-kurtto
 - WORKSPACE: /home/calegari/Documentos/Projetos/LF Calegari Sistemas/Kurtto/kurtto-api
 - BASE_BRANCH: development
+- Board: [LFC Command Center](https://github.com/orgs/LF-Calegari/projects/2) — `lfc-command-center-board.md`
+- SONAR_PROJECT_KEY: `LF-Calegari_lfc-kurtto` (confirmar em `sonar-project.properties` se divergir)
+
+---
+
+# 🧭 Board — orquestração obrigatória
+
+## Regra zero (gate)
+
+**Antes de qualquer alteração de código ou início de review, o card deve estar na trilha correta.**
+
+| Subagent | Trilha | Gate — proibido antes do card |
+|----------|--------|-------------------------------|
+| programmer | `In progress` | branch, editar arquivos, Docker, migrations, testes, PR |
+| reviewer | `In review` | Sonar, Snyk, diff, veredito, comentários na PR |
+
+O maestro **valida** **## 📋 Board** / **Board:**; se faltar, **reenvie** o subagent.
 
 ---
 
@@ -82,11 +98,13 @@ Chame **subagent programmer** com:
 
 - Instrução: implementar a issue `#{ISSUE_NUMBER}`
 - Contexto: repo, workspace, base branch
+- **Board — regra zero:**
+  > **Gate:** não crie branch nem rode Docker até mover o card. `lfc-command-center-board.md`, issue `#{ISSUE_NUMBER}` → **`In progress`** (`47fc9ee4`), `REPO_FILTER=lfc-kurtto`. Inclua **## 📋 Board** na saída.
 - Instruções específicas de execução:
   - Testes: `docker compose --profile test run --rm test`
   - Migrations: `docker compose --profile migrate run --rm migrate`
 
-Aguarde a PR ser criada. Capture o número da PR.
+Aguarde a PR ser criada. Capture o número da PR. **Valide** card em `In progress`.
 
 ---
 
@@ -96,6 +114,8 @@ Chame **subagent reviewer** com:
 
 - Instrução: revisar a PR `#{PR_NUMBER}` da issue `#{ISSUE_NUMBER}`
 - Contexto: repo, workspace
+- **Board — regra zero:**
+  > **Gate:** não consulte Sonar/Snyk nem analise diff até mover o card. Issue `#{ISSUE_NUMBER}` → **`In review`** (`df73e18b`). Inclua **Board:** no veredito.
 
 **Adicione obrigatoriamente esta instrução ao reviewer antes de qualquer etapa de review:**
 
@@ -154,7 +174,9 @@ Chame **subagent reviewer** com:
 - Pós-merge:
   - Deletar a branch remota
   - Fechar a issue `#{ISSUE_NUMBER}`
+  - Mover card para **`Done`** (`98236657`) — `lfc-command-center-board.md`
   - Criar PR de `development` → `main`
+  - Convocar **subagent po** para promover issues desbloqueadas para `Ready`
   - Usar a credencial correta do reviewer
 
 **Done ✅**
@@ -177,11 +199,11 @@ Chame **subagent reviewer** com:
 A cada ciclo, mantenha um log resumido:
 
 ```
-Iteração 1: IMPLEMENT → PR #XX criada
-Iteração 2: REVIEW → BLOCKER (3 problemas + Quality Gate failed)
+Iteração 1: IMPLEMENT → card In progress → PR #XX criada
+Iteração 2: REVIEW → card In review → BLOCKER (3 problemas + Quality Gate failed)
 Iteração 3: FIX → 3 correções aplicadas
 Iteração 4: REVIEW → APPROVED (Quality Gate OK)
-Iteração 5: MERGE → done
+Iteração 5: MERGE → card Done → issue fechada → done
 ```
 
 ---
@@ -190,6 +212,7 @@ Iteração 5: MERGE → done
 
 - Não implemente código — isso é do programmer
 - Não faça review — isso é do reviewer
+- **Não avance** se o subagent não confirmou o card na trilha correta
 - Não pule a espera do Quality Gate em nenhuma iteração de review
 - Não perca contexto entre iterações (sempre passe número da issue, PR e comentários)
 

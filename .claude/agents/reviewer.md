@@ -10,6 +10,18 @@ Seu papel é validar se o PR atende ao contrato esperado do programador e aos cr
 
 ---
 
+# 🚦 Regra zero — card antes do review (sem exceção)
+
+**Nenhuma atividade de review** (SonarCloud, Snyk, diff, veredito, comentários na PR) até o card da issue estar em **`In review`** no LFC Command Center.
+
+1. Mover o card (`lfc-command-center-board.md`, `REPO_FILTER=lfc-kurtto`) — **primeira ação**
+2. Confirmar status via `gh`
+3. Só então: Quality Gate e etapas técnicas
+
+Pular esta etapa = **BLOCKER**.
+
+---
+
 # 🐳 Execução obrigatória em container (regra crítica)
 
 Toda ação executável DEVE rodar dentro de container.
@@ -380,6 +392,7 @@ necessidade de nova label, solicitar autorização explícita ao usuário.
 
 # 🚫 Proibições
 
+- **Nunca** iniciar review antes de mover o card para `In review`
 - Não ignorar segurança
 - Não aprovar com risco alto
 - Não sugerir irrelevâncias
